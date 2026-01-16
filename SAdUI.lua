@@ -10,29 +10,9 @@ function addon:LoadConfig()
     self.config.version = "1.0"
     self.author = "Rôkk-Wyrmrest Accord"
 
-    self.config.settings.frameStyle = {
-        title = "frameStyle",
-        controls = {
-            {
-                type = "color",
-                name = "borderColor",
-                default = "ffffffff",
-            },
-        }
-    }
-
-    self.config.settings.markerStyle = {
-        title = "uiOptions",
-        controls = {
-            {
-                type = "checkbox",
-                name = "exampleCheckbox",
-                default = true,
-            },
-        }
-    }
-
     addon:RegisterEvent("PLAYER_ENTERING_WORLD", addon.OnPlayerEnteringWorld)
+    addon:RegisterEvent("PLAYER_REGEN_ENABLED", addon.OnPlayerRegenEnabled)
+    addon:RegisterEvent("PLAYER_REGEN_DISABLED", addon.OnPlayerRegenDisabled)
 end
 
 addon.updateUI = {}
@@ -41,6 +21,7 @@ addon.vars = {
     borderColor = "000000FF",
     iconZoom = .2
 }
+addon.pendingUIUpdate = false
 
 -- Comprehensive list of all action bar button prefixes
 addon.actionBarPrefixes = {
@@ -57,7 +38,7 @@ addon.actionBarPrefixes = {
 -- Helper function to iterate over all action buttons
 function addon:IterateActionButtons(callback)
     if type(callback) ~= "function" then
-        addon:debug("ERROR: IterateActionButtons requires a callback function")
+        -- addon:debug("ERROR: IterateActionButtons requires a callback function")
         return
     end
     
@@ -73,11 +54,25 @@ function addon:IterateActionButtons(callback)
 end
 
 function addon.updateUI.exampleOne()
-    addon:debug("exampleOne fired!")
+    -- addon:debug("exampleOne fired!")
+end
+
+function addon.updateUI.hideTotemFrame()
+    -- addon:debug("Hiding totem frame")
+    if TotemFrame then
+        TotemFrame:Hide()
+        TotemFrame:SetAlpha(0)
+        
+        -- Hook to keep it hidden
+        hooksecurefunc(TotemFrame, "Show", function(self)
+            self:Hide()
+            self:SetAlpha(0)
+        end)
+    end
 end
 
 function addon.updateUI.hideSpellCastAnimFrame()
-    addon:debug("Hiding spell cast animation frames on action buttons")
+    -- addon:debug("Hiding spell cast animation frames on action buttons")
     
     local function hideButtonGlow(button)
         if button and button.SpellCastAnimFrame then
@@ -85,35 +80,46 @@ function addon.updateUI.hideSpellCastAnimFrame()
             button.SpellCastAnimFrame:SetAlpha(0)
             button.SpellCastAnimFrame:Hide()
             
-            -- Hook the Show function to prevent it from ever showing
-            button.SpellCastAnimFrame.Show = function() end
-            button.SpellCastAnimFrame.SetAlpha = function() end
+            -- Hook Show to keep it hidden without overriding the function
+            hooksecurefunc(button.SpellCastAnimFrame, "Show", function(self)
+                self:SetAlpha(0)
+            end)
             
             -- Hide all child textures and frames
             if button.SpellCastAnimFrame.Fill then
                 button.SpellCastAnimFrame.Fill:SetAlpha(0)
                 button.SpellCastAnimFrame.Fill:Hide()
-                button.SpellCastAnimFrame.Fill.Show = function() end
+                hooksecurefunc(button.SpellCastAnimFrame.Fill, "Show", function(self)
+                    self:SetAlpha(0)
+                end)
             end
             if button.SpellCastAnimFrame.InnerGlow then
                 button.SpellCastAnimFrame.InnerGlow:SetAlpha(0)
                 button.SpellCastAnimFrame.InnerGlow:Hide()
-                button.SpellCastAnimFrame.InnerGlow.Show = function() end
+                hooksecurefunc(button.SpellCastAnimFrame.InnerGlow, "Show", function(self)
+                    self:SetAlpha(0)
+                end)
             end
             if button.SpellCastAnimFrame.FillMask then
                 button.SpellCastAnimFrame.FillMask:SetAlpha(0)
                 button.SpellCastAnimFrame.FillMask:Hide()
-                button.SpellCastAnimFrame.FillMask.Show = function() end
+                hooksecurefunc(button.SpellCastAnimFrame.FillMask, "Show", function(self)
+                    self:SetAlpha(0)
+                end)
             end
             if button.SpellCastAnimFrame.Ants then
                 button.SpellCastAnimFrame.Ants:SetAlpha(0)
                 button.SpellCastAnimFrame.Ants:Hide()
-                button.SpellCastAnimFrame.Ants.Show = function() end
+                hooksecurefunc(button.SpellCastAnimFrame.Ants, "Show", function(self)
+                    self:SetAlpha(0)
+                end)
             end
             if button.SpellCastAnimFrame.Spark then
                 button.SpellCastAnimFrame.Spark:SetAlpha(0)
                 button.SpellCastAnimFrame.Spark:Hide()
-                button.SpellCastAnimFrame.Spark.Show = function() end
+                hooksecurefunc(button.SpellCastAnimFrame.Spark, "Show", function(self)
+                    self:SetAlpha(0)
+                end)
             end
         end
         
@@ -121,7 +127,9 @@ function addon.updateUI.hideSpellCastAnimFrame()
         if button and button.InterruptDisplay then
             button.InterruptDisplay:SetAlpha(0)
             button.InterruptDisplay:Hide()
-            button.InterruptDisplay.Show = function() end
+            hooksecurefunc(button.InterruptDisplay, "Show", function(self)
+                self:SetAlpha(0)
+            end)
             if button.InterruptDisplay.Base then
                 button.InterruptDisplay.Base:SetAlpha(0)
                 button.InterruptDisplay.Base:Hide()
@@ -157,58 +165,62 @@ function addon.updateUI.hideSpellCastAnimFrame()
         hideButtonGlow(button)
     end)
     
-    addon:debug("Finished hiding spell cast animation frames")
+    -- addon:debug("Finished hiding spell cast animation frames")
 end
 
 function addon.updateUI.hideMacroText()
-    addon:debug("Hiding macro text on action buttons")
+    -- addon:debug("Hiding macro text on action buttons")
     
     local function hideButtonMacroText(button, buttonName)
         if button and button.Name then
             button.Name:SetAlpha(0)
             button.Name:Hide()
-            button.Name.Show = function() end
-            button.Name.SetAlpha = function() end
-            addon:debug("Hid macro text for: " .. buttonName)
+            -- Hook to keep it hidden without overriding Show()
+            hooksecurefunc(button.Name, "Show", function(self)
+                self:SetAlpha(0)
+            end)
+            -- addon:debug("Hid macro text for: " .. buttonName)
         end
     end
     
     -- Iterate over all action buttons using the shared helper
     addon:IterateActionButtons(hideButtonMacroText)
     
-    addon:debug("Finished hiding macro text")
+    -- addon:debug("Finished hiding macro text")
 end
 
 function addon.updateUI.hideKeybindText()
-    addon:debug("Hiding keybind text on action buttons")
+    -- addon:debug("Hiding keybind text on action buttons")
     
     local function hideButtonKeybind(button, buttonName)
         if button and button.HotKey then
             button.HotKey:SetAlpha(0)
             button.HotKey:Hide()
-            button.HotKey.Show = function() end
-            button.HotKey.SetAlpha = function() end
-            addon:debug("Hid keybind text for: " .. buttonName)
+            -- Hook to keep it hidden without overriding Show()
+            hooksecurefunc(button.HotKey, "Show", function(self)
+                self:SetAlpha(0)
+            end)
+            -- addon:debug("Hid keybind text for: " .. buttonName)
         end
     end
     
     -- Iterate over all action buttons using the shared helper
     addon:IterateActionButtons(hideButtonKeybind)
     
-    addon:debug("Finished hiding keybind text")
+    -- addon:debug("Finished hiding keybind text")
 end
 
 function addon.updateUI.setCVars()
-    addon:debug("Setting CVars")
+    -- addon:debug("Setting CVars")
     
     SetCVar("mapFade", 0)
-    addon:debug("Set mapFade to 0")
+    -- addon:debug("Set mapFade to 0")
     
-    addon:debug("Finished setting CVars")
+    -- addon:debug("Finished setting CVars")
 end
 
 function addon.updateUI.addActionButtonBorders()
-    addon:debug("Adding borders to action buttons")
+    -- addon:debug("Adding borders to action buttons")
     
     local function addButtonBorder(button, buttonName)
         if button then
@@ -226,18 +238,18 @@ function addon.updateUI.addActionButtonBorders()
             end
             
             addon:addBorder(button)
-            addon:debug("Added border to: " .. buttonName)
+            -- addon:debug("Added border to: " .. buttonName)
         end
     end
     
     -- Iterate over all action buttons using the shared helper
     addon:IterateActionButtons(addButtonBorder)
     
-    addon:debug("Finished adding borders to action buttons")
+    -- addon:debug("Finished adding borders to action buttons")
 end
 
 function addon.updateUI.setButtonPadding()
-    addon:debug("Setting button padding on action bars")
+    -- addon:debug("Setting button padding on action bars")
     
     local padding = addon.vars.buttonPadding
     
@@ -259,7 +271,7 @@ function addon.updateUI.setButtonPadding()
             -- Set the button spacing attribute that Blizzard's layout system uses
             if bar.SetAttribute then
                 bar:SetAttribute("buttonSpacing", padding)
-                addon:debug("Set buttonSpacing for: " .. (bar:GetName() or prefix))
+                -- addon:debug("Set buttonSpacing for: " .. (bar:GetName() or prefix))
             end
             
             -- Hook the bar's layout refresh to apply our spacing
@@ -280,11 +292,11 @@ function addon.updateUI.setButtonPadding()
         end
     end
     
-    addon:debug("Finished setting button padding (Blizzard layout system will handle positioning)")
+    -- addon:debug("Finished setting button padding (Blizzard layout system will handle positioning)")
 end
 
 function addon.updateUI.zoomButtonIcons()
-    addon:debug("Zooming button icons on action bars")
+    -- addon:debug("Zooming button icons on action bars")
     
     local zoom = addon.vars.iconZoom
     local inset = zoom / 2
@@ -293,14 +305,372 @@ function addon.updateUI.zoomButtonIcons()
         if button and button.icon then
             -- Crop the texture edges to create a zoom effect
             button.icon:SetTexCoord(inset, 1 - inset, inset, 1 - inset)
-            addon:debug("Zoomed icon for: " .. buttonName .. " by " .. (zoom * 100) .. "%")
+            
+            -- Make the cooldown frame fill the entire button (not inset like the icon)
+            if button.cooldown then
+                button.cooldown:ClearAllPoints()
+                button.cooldown:SetAllPoints(button)
+            end
+            
+            -- addon:debug("Zoomed icon for: " .. buttonName .. " by " .. (zoom * 100) .. "%")
         end
     end
     
     -- Iterate over all action buttons using the shared helper
     addon:IterateActionButtons(zoomButtonIcon)
     
-    addon:debug("Finished zooming button icons")
+    -- addon:debug("Finished zooming button icons")
+end
+
+function addon.updateUI.customizeAssistedHighlightGlow()
+    -- addon:debug("Customizing assisted highlight glow on action buttons")
+    
+    -- Function to update the assisted highlight flipbook
+    local function UpdateAssistedHighlight(actionButton, shown)
+        local highlightFrame = actionButton.AssistedCombatHighlightFrame
+        
+        -- Only show the glow if in combat
+        local inCombat = UnitAffectingCombat("player")
+        
+        if highlightFrame and highlightFrame:IsVisible() and shown and inCombat then
+            local flipbook = highlightFrame.Flipbook
+            if flipbook then
+                -- Set to Modern Blizzard Glow style
+                flipbook:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
+                
+                -- Desaturate the texture first (converts to grayscale)
+                flipbook:SetDesaturated(true)
+                
+                -- Apply magenta color (#ff00ff)
+                flipbook:SetVertexColor(1.0, 0.0, 1.0, 1.0) -- RGB: 1.0, 0.0, 1.0 = #ff00ff
+                
+                -- Get the flipbook animation
+                local anim = flipbook.Anim:GetAnimations()
+                if anim then
+                    -- Configure the animation for Modern Blizzard Glow
+                    flipbook:ClearAllPoints()
+                    flipbook:SetSize(flipbook:GetSize())
+                    flipbook:SetPoint("CENTER", highlightFrame, "CENTER", -1.5, 1)
+                    
+                    -- Restart the animation
+                    flipbook.Anim:Stop()
+                    flipbook.Anim:Play()
+                end
+                
+                -- addon:debug("Updated assisted highlight glow for button: " .. (actionButton:GetName() or "unknown"))
+            end
+        elseif highlightFrame and not inCombat then
+            -- Hide the glow when out of combat
+            highlightFrame:Hide()
+        end
+    end
+    
+    -- Hook the assisted combat manager
+    if AssistedCombatManager then
+        hooksecurefunc(AssistedCombatManager, "SetAssistedHighlightFrameShown", function(self, actionButton, shown)
+            UpdateAssistedHighlight(actionButton, shown)
+        end)
+        -- addon:debug("Hooked AssistedCombatManager.SetAssistedHighlightFrameShown")
+    else
+        -- addon:debug("WARNING: AssistedCombatManager not found")
+    end
+    
+    -- addon:debug("Finished customizing assisted highlight glow")
+end
+
+function addon.updateUI.customizeProcGlow()
+    -- addon:debug("Hiding proc glow on action buttons")
+    
+    -- First, hide any proc glows that are already showing
+    addon:IterateActionButtons(function(button, buttonName)
+        if button and button.SpellActivationAlert then
+            button.SpellActivationAlert:Hide()
+            button.SpellActivationAlert:SetAlpha(0)
+            
+            -- Hook Show to keep it hidden
+            if not button.SpellActivationAlert.__SAdUI_HideHooked then
+                button.SpellActivationAlert.__SAdUI_HideHooked = true
+                hooksecurefunc(button.SpellActivationAlert, "Show", function(self)
+                    self:Hide()
+                    self:SetAlpha(0)
+                end)
+            end
+        end
+    end)
+    
+    -- Also hook the ActionButtonSpellAlertManager ShowAlert function
+    if ActionButtonSpellAlertManager and not ActionButtonSpellAlertManager.__SAdUI_Hooked then
+        ActionButtonSpellAlertManager.__SAdUI_Hooked = true
+        hooksecurefunc(ActionButtonSpellAlertManager, "ShowAlert", function(self, actionButton)
+            -- Make sure we have a valid button
+            if type(actionButton) ~= "table" then
+                actionButton = self
+            end
+            
+            if actionButton and actionButton.SpellActivationAlert then
+                actionButton.SpellActivationAlert:Hide()
+                actionButton.SpellActivationAlert:SetAlpha(0)
+            end
+        end)
+        -- addon:debug("Hooked ActionButtonSpellAlertManager.ShowAlert to hide proc glows")
+    end
+    
+    -- addon:debug("Finished hiding proc glow")
+end
+
+function addon.updateUI.customizeBattlefieldMap()
+    -- addon:debug("Customizing battlefield map border")
+    
+    local mapFrame = BattlefieldMapFrame
+    if mapFrame then
+        -- Hook the Show function to apply our customizations when the map is displayed
+        hooksecurefunc(mapFrame, "Show", function()
+            -- Hide the default border
+            if mapFrame.BorderFrame then
+                mapFrame.BorderFrame:Hide()
+                mapFrame.BorderFrame:SetAlpha(0)
+            end
+            
+            -- Create overlay frame and add custom border
+            if mapFrame.ScrollContainer then
+                if not mapFrame.ScrollContainer.SAdUI_BorderFrame then
+                    local borderFrame = CreateFrame("Frame", nil, mapFrame.ScrollContainer)
+                    borderFrame:SetAllPoints(mapFrame.ScrollContainer)
+                    mapFrame.ScrollContainer.SAdUI_BorderFrame = borderFrame
+                end
+                addon:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
+            end
+        end)
+        
+        -- Apply immediately if the map is already showing
+        if mapFrame:IsShown() and mapFrame.ScrollContainer then
+            if mapFrame.BorderFrame then
+                mapFrame.BorderFrame:Hide()
+                mapFrame.BorderFrame:SetAlpha(0)
+            end
+            
+            if not mapFrame.ScrollContainer.SAdUI_BorderFrame then
+                local borderFrame = CreateFrame("Frame", nil, mapFrame.ScrollContainer)
+                borderFrame:SetAllPoints(mapFrame.ScrollContainer)
+                mapFrame.ScrollContainer.SAdUI_BorderFrame = borderFrame
+            end
+            addon:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
+        end
+    end
+    
+    -- addon:debug("Finished customizing battlefield map")
+end
+
+function addon.updateUI.scaleZoneMap()
+    -- addon:debug("Scaling zone map")
+    
+    local scale = 1.25
+    
+    local mapFrame = BattlefieldMapFrame
+    if mapFrame then
+        mapFrame:SetScale(scale)
+        -- addon:debug("Set zone map scale to: " .. tostring(scale))
+    end
+    
+    -- addon:debug("Finished scaling zone map")
+end
+
+function addon.updateUI.unclampChatFrames()
+    -- addon:debug("Unclamping chat frames from screen")
+    
+    for i = 1, NUM_CHAT_WINDOWS do
+        local chatFrame = _G["ChatFrame" .. i]
+        if chatFrame then
+            chatFrame:SetClampedToScreen(false)
+            -- addon:debug("Unclamped ChatFrame" .. i)
+        end
+    end
+    
+    -- addon:debug("Finished unclamping chat frames")
+end
+
+function addon.updateUI.repositionChatEditBox()
+    -- addon:debug("Repositioning chat edit boxes")
+    
+    for i = 1, NUM_CHAT_WINDOWS do
+        local editBox = _G["ChatFrame" .. i .. "EditBox"]
+        if editBox then
+            editBox:ClearAllPoints()
+            editBox:SetPoint("TOPLEFT", _G["ChatFrame" .. i], "BOTTOMLEFT", 0, 25)
+            editBox:SetPoint("TOPRIGHT", _G["ChatFrame" .. i], "BOTTOMRIGHT", 0, 0)
+            
+            -- Hide all border textures
+            for j = 1, editBox:GetNumRegions() do
+                local region = select(j, editBox:GetRegions())
+                if region and region:GetObjectType() == "Texture" then
+                    region:SetAlpha(0)
+                    region:Hide()
+                end
+            end
+            
+            -- Add black background texture
+            if not editBox.SAdUI_Background then
+                editBox.SAdUI_Background = editBox:CreateTexture(nil, "BACKGROUND")
+                editBox.SAdUI_Background:SetAllPoints(editBox)
+                editBox.SAdUI_Background:SetColorTexture(0, 0, 0, 1)
+                
+                -- Hook SetShown to sync background visibility
+                hooksecurefunc(editBox, "SetShown", function(self, shown)
+                    if self.SAdUI_Background then
+                        self.SAdUI_Background:SetShown(shown)
+                    end
+                end)
+                
+                hooksecurefunc(editBox, "SetAlpha", function(self, alpha)
+                    if self.SAdUI_Background then
+                        self.SAdUI_Background:SetAlpha(alpha)
+                    end
+                end)
+            end
+            
+            -- Sync initial visibility and alpha
+            if editBox.SAdUI_Background then
+                editBox.SAdUI_Background:SetShown(editBox:IsShown())
+                editBox.SAdUI_Background:SetAlpha(editBox:GetAlpha())
+            end
+            
+            -- addon:debug("Repositioned ChatFrame" .. i .. "EditBox")
+        end
+    end
+    
+    -- addon:debug("Finished repositioning chat edit boxes")
+end
+
+function addon.updateUI.customizeMinimap()
+    -- addon:debug("Customizing minimap")
+    
+    -- Minimap dimensions (adjustable)
+    local minimapWidth = 373
+    local minimapHeight = 248
+    
+    -- Make minimap rectangular and set size
+    if Minimap then
+        -- Remove the circular mask to make it rectangular
+        Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
+        
+        -- Set custom size
+        Minimap:SetSize(minimapWidth, minimapHeight)
+        
+        -- Add border
+        addon:addBorder(Minimap)
+    end
+    
+    -- Hide MinimapBackdrop
+    if MinimapBackdrop then
+        MinimapBackdrop:Hide()
+        MinimapBackdrop:SetAlpha(0)
+    end
+    
+    -- Hide BorderTop
+    if MinimapCluster and MinimapCluster.BorderTop then
+        MinimapCluster.BorderTop:Hide()
+        MinimapCluster.BorderTop:SetAlpha(0)
+    end
+    
+    -- Hide Tracking button and background
+    if MinimapCluster and MinimapCluster.Tracking then
+        if MinimapCluster.Tracking.Button then
+            MinimapCluster.Tracking.Button:Hide()
+            MinimapCluster.Tracking.Button:SetAlpha(0)
+        end
+        if MinimapCluster.Tracking.Background then
+            MinimapCluster.Tracking.Background:Hide()
+            MinimapCluster.Tracking.Background:SetAlpha(0)
+        end
+    end
+    
+    -- Hide Zone text and background
+    if MinimapCluster and MinimapCluster.ZoneTextButton then
+        MinimapCluster.ZoneTextButton:Hide()
+        MinimapCluster.ZoneTextButton:SetAlpha(0)
+        
+        -- Hide all regions (backgrounds) of ZoneTextButton
+        for i = 1, MinimapCluster.ZoneTextButton:GetNumRegions() do
+            local region = select(i, MinimapCluster.ZoneTextButton:GetRegions())
+            if region then
+                region:Hide()
+                region:SetAlpha(0)
+            end
+        end
+    end
+    
+    -- Hide Calendar button
+    if GameTimeFrame then
+        GameTimeFrame:Hide()
+        GameTimeFrame:SetAlpha(0)
+    end
+    
+    -- Hide Zoom In/Out buttons
+    if Minimap then
+        if Minimap.ZoomIn then
+            Minimap.ZoomIn:Hide()
+            Minimap.ZoomIn:SetAlpha(0)
+        end
+        if Minimap.ZoomOut then
+            Minimap.ZoomOut:Hide()
+            Minimap.ZoomOut:SetAlpha(0)
+        end
+    end
+    
+    -- Also hide global zoom buttons if they exist
+    if MinimapZoomIn then
+        MinimapZoomIn:Hide()
+        MinimapZoomIn:SetAlpha(0)
+    end
+    if MinimapZoomOut then
+        MinimapZoomOut:Hide()
+        MinimapZoomOut:SetAlpha(0)
+    end
+    
+    -- Force minimap to recenter by triggering a zoom operation
+    if Minimap then
+        C_Timer.After(0.1, function()
+            local currentZoom = Minimap:GetZoom()
+            -- Zoom out then back in to force recenter
+            if currentZoom < Minimap:GetZoomLevels() then
+                Minimap:SetZoom(currentZoom + 1)
+            else
+                Minimap:SetZoom(currentZoom - 1)
+            end
+            -- Restore original zoom level
+            C_Timer.After(0.05, function()
+                Minimap:SetZoom(currentZoom)
+            end)
+        end)
+    end
+    
+    -- addon:debug("Finished customizing minimap")
+end
+
+function addon.updateUI.customizeClock()
+    -- addon:debug("Customizing clock")
+    
+    local clockButton = TimeManagerClockButton
+    if clockButton then
+        -- Reposition to center top of screen
+        clockButton:ClearAllPoints()
+        clockButton:SetPoint("TOP", UIParent, "TOP", 0, -10)
+        
+        -- Make the text bigger and center aligned
+        local ticker = TimeManagerClockTicker
+        if ticker then
+            ticker:SetFont(ticker:GetFont(), 18, "OUTLINE")
+            ticker:SetJustifyH("CENTER")
+        end
+    end
+    
+    -- Position addon compartment to the right of clock
+    if AddonCompartmentFrame and clockButton then
+        AddonCompartmentFrame:ClearAllPoints()
+        AddonCompartmentFrame:SetPoint("LEFT", clockButton, "RIGHT", 15, 0)
+    end
+    
+    -- addon:debug("Finished customizing clock")
 end
 
 function addon:addBorder(bar)
@@ -359,15 +729,124 @@ function addon:addBorder(bar)
     end
 end
 
-function addon:OnPlayerEnteringWorld()
-    addon:debug("PLAYER_ENTERING_WORLD event fired - Running all updateUI functions")
-    for funcName, func in pairs(addon.updateUI) do
-        addon:debug("Found updateUI entry: " .. funcName .. " (type: " .. type(func) .. ")")
-        if type(func) == "function" then
-            addon:debug("Running updateUI." .. funcName)
-            func()
-            addon:debug("Completed updateUI." .. funcName)
+function addon.updateUI.addBuffIconGlow()
+    local function OnUnitAura(event, unit)
+        if unit ~= "player" then return end
+        
+        if BuffIconCooldownViewer then
+            for _, child in pairs({BuffIconCooldownViewer:GetChildren()}) do
+                if child.Icon and not child.SAdUI_ProcGlow then
+                    -- Create proc glow frame manually
+                    local procGlow = CreateFrame("Frame", nil, child)
+                    procGlow:SetSize(child:GetWidth() * 1.4, child:GetHeight() * 1.4)
+                    procGlow:SetPoint("CENTER")
+                    
+                    -- Create proc loop flipbook texture (the continuous glow)
+                    local procLoop = procGlow:CreateTexture(nil, "ARTWORK")
+                    procLoop:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
+                    procLoop:SetAllPoints(procGlow)
+                    procLoop:SetAlpha(0)
+                    procLoop:SetDesaturated(true)
+                    procLoop:SetVertexColor(1, 0, 1)
+                    procGlow.ProcLoopFlipbook = procLoop
+                    
+                    -- Create animation group for proc loop
+                    local procLoopAnim = procGlow:CreateAnimationGroup()
+                    procLoopAnim:SetLooping("REPEAT")
+                    
+                    local alpha = procLoopAnim:CreateAnimation("Alpha")
+                    alpha:SetChildKey("ProcLoopFlipbook")
+                    alpha:SetDuration(0.001)
+                    alpha:SetOrder(0)
+                    alpha:SetFromAlpha(1)
+                    alpha:SetToAlpha(1)
+                    
+                    local flip = procLoopAnim:CreateAnimation("FlipBook")
+                    flip:SetChildKey("ProcLoopFlipbook")
+                    flip:SetDuration(1)
+                    flip:SetOrder(0)
+                    flip:SetFlipBookRows(6)
+                    flip:SetFlipBookColumns(5)
+                    flip:SetFlipBookFrames(30)
+                    
+                    procGlow.ProcLoop = procLoopAnim
+                    
+                    -- Play the loop animation
+                    procLoopAnim:Play()
+                    
+                    child.SAdUI_ProcGlow = procGlow
+                end
+            end
         end
     end
-    addon:debug("Finished running all updateUI functions")
+    
+    addon:RegisterEvent("UNIT_AURA", OnUnitAura)
+end
+
+function addon:OnPlayerEnteringWorld()
+    -- addon:debug("PLAYER_ENTERING_WORLD event fired")
+    addon:RunUIUpdates()
+end
+
+function addon:OnPlayerRegenEnabled()
+    -- addon:debug("Leaving combat")
+    
+    -- Hide all assisted highlight glows when leaving combat
+    addon:UpdateAssistedHighlightVisibility()
+    
+    if addon.pendingUIUpdate then
+        -- addon:debug("Running pending UI updates after combat")
+        addon.pendingUIUpdate = false
+        addon:RunUIUpdates()
+    end
+end
+
+function addon:OnPlayerRegenDisabled()
+    -- addon:debug("Entering combat")
+    
+    -- Show assisted highlight glows when entering combat (if they should be visible)
+    addon:UpdateAssistedHighlightVisibility()
+end
+
+function addon:UpdateAssistedHighlightVisibility()
+    local inCombat = UnitAffectingCombat("player")
+    
+    addon:IterateActionButtons(function(button, buttonName)
+        if button and button.AssistedCombatHighlightFrame then
+            local highlightFrame = button.AssistedCombatHighlightFrame
+            if not inCombat then
+                -- Force hide when out of combat
+                highlightFrame:Hide()
+            end
+            -- When in combat, let the normal assisted combat system handle visibility
+        end
+    end)
+end
+
+function addon:RunUIUpdates()
+    if InCombatLockdown() then
+        -- addon:debug("In combat lockdown - deferring UI updates")
+        addon.pendingUIUpdate = true
+        return
+    end
+    
+    -- Delay UI updates to ensure Blizzard UI is fully loaded and to avoid tainting during initialization
+    C_Timer.After(0.5, function()
+        if InCombatLockdown() then
+            -- addon:debug("In combat after delay - deferring UI updates")
+            addon.pendingUIUpdate = true
+            return
+        end
+        
+        -- addon:debug("Running all updateUI functions")
+        for funcName, func in pairs(addon.updateUI) do
+            -- addon:debug("Found updateUI entry: " .. funcName .. " (type: " .. type(func) .. ")")
+            if type(func) == "function" then
+                -- addon:debug("Running updateUI." .. funcName)
+                func()
+                -- addon:debug("Completed updateUI." .. funcName)
+            end
+        end
+        -- addon:debug("Finished running all updateUI functions")
+    end)
 end
