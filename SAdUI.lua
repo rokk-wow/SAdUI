@@ -2,7 +2,7 @@
 -- SADCORE FRAMEWORK INITIALIZATION (REQUIRED - DO NOT MODIFY)
 -- ===========================================================================
 -- This section is required by the SAdCore framework and must remain at the top.
--- The LoadConfig function is called by SAdCore during addon initialization.
+-- The Initialize function is called by SAdCore during addon initialization.
 -- ===========================================================================
 
 local addonName = ...
@@ -13,14 +13,15 @@ addon.savedVarsGlobalName = "SAdUI_Settings_Global"
 addon.savedVarsPerCharName = "SAdUI_Settings_Char"
 addon.compartmentFuncName = "SAdUI_Compartment_Func"
 
-function addon:LoadConfig()
+function addon:Initialize()
     self.config.version = "1.0"
     self.author = "Rôkk-Wyrmrest Accord"
-
+    
+    -- Event registration must be at the end of Initialize
     addon:RegisterEvent("PLAYER_ENTERING_WORLD", addon.OnPlayerEnteringWorld)
 end
 
-function addon:OnPlayerEnteringWorld()
+function addon.OnPlayerEnteringWorld()
     for funcName, func in pairs(addon.updateUI) do
         if type(func) == "function" then
             func()
@@ -42,7 +43,7 @@ do -- Shared functions
         
         local size = borderWidth or self.vars.borderWidth
         local colorHex = borderColor or self.vars.borderColor
-        local r, g, b, a = self:hexToRGB(colorHex)
+        local r, g, b, a = self:HexToRGB(colorHex)
         
         local borders = bar.SAdUnitFrames_Borders
         
