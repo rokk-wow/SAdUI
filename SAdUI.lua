@@ -1,3 +1,10 @@
+-- ===========================================================================
+-- SADCORE FRAMEWORK INITIALIZATION (REQUIRED - DO NOT MODIFY)
+-- ===========================================================================
+-- This section is required by the SAdCore framework and must remain at the top.
+-- The LoadConfig function is called by SAdCore during addon initialization.
+-- ===========================================================================
+
 local addonName = ...
 local SAdCore = LibStub("SAdCore-1")
 local addon = SAdCore:GetAddon(addonName)
@@ -11,428 +18,185 @@ function addon:LoadConfig()
     self.author = "Rôkk-Wyrmrest Accord"
 
     addon:RegisterEvent("PLAYER_ENTERING_WORLD", addon.OnPlayerEnteringWorld)
-    addon:RegisterEvent("PLAYER_REGEN_ENABLED", addon.OnPlayerRegenEnabled)
-    addon:RegisterEvent("PLAYER_REGEN_DISABLED", addon.OnPlayerRegenDisabled)
 end
 
-addon.updateUI = {}
+function addon:OnPlayerEnteringWorld()
+    for funcName, func in pairs(addon.updateUI) do
+        if type(func) == "function" then
+            func()
+        end
+    end
+end
+
 addon.vars = {
     borderWidth = 2,
     borderColor = "000000FF",
     iconZoom = .2
 }
-addon.pendingUIUpdate = false
 
--- Comprehensive list of all action bar button prefixes
-addon.actionBarPrefixes = {
-    "ActionButton",              -- Main action bar (1-12)
-    "MultiBarBottomLeftButton",  -- Bottom left bar (1-12)
-    "MultiBarBottomRightButton", -- Bottom right bar (1-12)
-    "MultiBarRightButton",       -- Right bar (1-12)
-    "MultiBarLeftButton",        -- Right bar 2 (1-12)
-    "MultiBar5Button",           -- Additional bar 5 (1-12)
-    "MultiBar6Button",           -- Additional bar 6 (1-12)
-    "MultiBar7Button",           -- Additional bar 7 (1-12)
-}
+addon.updateUI = {}
 
--- Helper function to iterate over all action buttons
-function addon:IterateActionButtons(callback)
-    if type(callback) ~= "function" then
-        -- addon:debug("ERROR: IterateActionButtons requires a callback function")
-        return
-    end
-    
-    for _, prefix in ipairs(addon.actionBarPrefixes) do
-        for i = 1, 12 do
-            local buttonName = prefix .. i
-            local button = _G[buttonName]
-            if button then
-                callback(button, buttonName)
-            end
+do -- Shared functions
+    function addon:addBorder(bar, borderWidth, borderColor)
+        if not bar then return end
+        
+        local size = borderWidth or self.vars.borderWidth
+        local colorHex = borderColor or self.vars.borderColor
+        local r, g, b, a = self:hexToRGB(colorHex)
+        
+        local borders = bar.SAdUnitFrames_Borders
+        
+        if borders then
+            borders.top:SetColorTexture(r, g, b, a)
+            borders.top:SetHeight(size)
+            borders.bottom:SetColorTexture(r, g, b, a)
+            borders.bottom:SetHeight(size)
+            borders.left:SetColorTexture(r, g, b, a)
+            borders.left:SetWidth(size)
+            borders.right:SetColorTexture(r, g, b, a)
+            borders.right:SetWidth(size)
+        else
+            borders = {}
+            
+            borders.top = bar:CreateTexture(nil, "OVERLAY")
+            borders.top:SetColorTexture(r, g, b, a)
+            borders.top:SetHeight(size)
+            borders.top:ClearAllPoints()
+            borders.top:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+            borders.top:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
+            
+            borders.bottom = bar:CreateTexture(nil, "OVERLAY")
+            borders.bottom:SetColorTexture(r, g, b, a)
+            borders.bottom:SetHeight(size)
+            borders.bottom:ClearAllPoints()
+            borders.bottom:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+            borders.bottom:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
+            
+            borders.left = bar:CreateTexture(nil, "OVERLAY")
+            borders.left:SetColorTexture(r, g, b, a)
+            borders.left:SetWidth(size)
+            borders.left:ClearAllPoints()
+            borders.left:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+            borders.left:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+            
+            borders.right = bar:CreateTexture(nil, "OVERLAY")
+            borders.right:SetColorTexture(r, g, b, a)
+            borders.right:SetWidth(size)
+            borders.right:ClearAllPoints()
+            borders.right:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
+            borders.right:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
+            
+            bar.SAdUnitFrames_Borders = borders
         end
     end
 end
 
-function addon.updateUI.exampleOne()
-    -- addon:debug("exampleOne fired!")
-end
+-- ===========================================================================
+-- ACTION BAR 8 OPACITY
+-- ===========================================================================
 
-function addon.updateUI.hideTotemFrame()
-    -- addon:debug("Hiding totem frame")
-    if TotemFrame then
-        TotemFrame:Hide()
-        TotemFrame:SetAlpha(0)
-        
-        -- Hook to keep it hidden
-        hooksecurefunc(TotemFrame, "Show", function(self)
-            self:Hide()
-            self:SetAlpha(0)
-        end)
+do
+    function addon.updateUI.SetActionBar8Opacity()
+        if MultiBar7 then
+            MultiBar7:SetAlpha(0)
+        end
     end
 end
 
-function addon.updateUI.hideSpellCastAnimFrame()
-    -- addon:debug("Hiding spell cast animation frames on action buttons")
-    
-    local function hideButtonGlow(button)
-        if button and button.SpellCastAnimFrame then
-            -- Permanently hide the entire frame
-            button.SpellCastAnimFrame:SetAlpha(0)
-            button.SpellCastAnimFrame:Hide()
+-- ===========================================================================
+-- FRAME HIDING: TOTEM FRAME
+-- ===========================================================================
+
+do
+    function addon.updateUI.HideTotemFrame()
+        if TotemFrame then
+            TotemFrame:Hide()
+            TotemFrame:SetAlpha(0)
             
-            -- Hook Show to keep it hidden without overriding the function
-            hooksecurefunc(button.SpellCastAnimFrame, "Show", function(self)
+            hooksecurefunc(TotemFrame, "Show", function(self)
+                self:Hide()
                 self:SetAlpha(0)
             end)
-            
-            -- Hide all child textures and frames
-            if button.SpellCastAnimFrame.Fill then
-                button.SpellCastAnimFrame.Fill:SetAlpha(0)
-                button.SpellCastAnimFrame.Fill:Hide()
-                hooksecurefunc(button.SpellCastAnimFrame.Fill, "Show", function(self)
-                    self:SetAlpha(0)
-                end)
-            end
-            if button.SpellCastAnimFrame.InnerGlow then
-                button.SpellCastAnimFrame.InnerGlow:SetAlpha(0)
-                button.SpellCastAnimFrame.InnerGlow:Hide()
-                hooksecurefunc(button.SpellCastAnimFrame.InnerGlow, "Show", function(self)
-                    self:SetAlpha(0)
-                end)
-            end
-            if button.SpellCastAnimFrame.FillMask then
-                button.SpellCastAnimFrame.FillMask:SetAlpha(0)
-                button.SpellCastAnimFrame.FillMask:Hide()
-                hooksecurefunc(button.SpellCastAnimFrame.FillMask, "Show", function(self)
-                    self:SetAlpha(0)
-                end)
-            end
-            if button.SpellCastAnimFrame.Ants then
-                button.SpellCastAnimFrame.Ants:SetAlpha(0)
-                button.SpellCastAnimFrame.Ants:Hide()
-                hooksecurefunc(button.SpellCastAnimFrame.Ants, "Show", function(self)
-                    self:SetAlpha(0)
-                end)
-            end
-            if button.SpellCastAnimFrame.Spark then
-                button.SpellCastAnimFrame.Spark:SetAlpha(0)
-                button.SpellCastAnimFrame.Spark:Hide()
-                hooksecurefunc(button.SpellCastAnimFrame.Spark, "Show", function(self)
-                    self:SetAlpha(0)
-                end)
-            end
         end
-        
-        -- Hide interrupt display
-        if button and button.InterruptDisplay then
-            button.InterruptDisplay:SetAlpha(0)
-            button.InterruptDisplay:Hide()
-            hooksecurefunc(button.InterruptDisplay, "Show", function(self)
+    end
+end
+
+-- ===========================================================================
+-- FRAME HIDING: QUICK JOIN TOAST BUTTON
+-- ===========================================================================
+
+do
+    function addon.updateUI.HideQuickJoinToastButton()
+        if QuickJoinToastButton then
+            QuickJoinToastButton:Hide()
+            QuickJoinToastButton:SetAlpha(0)
+            
+            hooksecurefunc(QuickJoinToastButton, "Show", function(self)
+                self:Hide()
                 self:SetAlpha(0)
             end)
-            if button.InterruptDisplay.Base then
-                button.InterruptDisplay.Base:SetAlpha(0)
-                button.InterruptDisplay.Base:Hide()
-            end
-            if button.InterruptDisplay.Highlight then
-                button.InterruptDisplay.Highlight:SetAlpha(0)
-                button.InterruptDisplay.Highlight:Hide()
-            end
-        end
-        
-        -- Hide CheckedTexture (inner glow when casting)
-        if button then
-            local checkedTexture = button:GetCheckedTexture()
-            if checkedTexture then
-                checkedTexture:SetAlpha(0)
-                checkedTexture:Hide()
-            end
-            -- Disable the checked state
-            hooksecurefunc(button, "SetChecked", function(self)
-                if self:GetChecked() then
-                    local tex = self:GetCheckedTexture()
-                    if tex then
-                        tex:SetAlpha(0)
-                        tex:Hide()
-                    end
-                end
-            end)
         end
     end
-    
-    -- Iterate over all action buttons using the shared helper
-    addon:IterateActionButtons(function(button, buttonName)
-        hideButtonGlow(button)
-    end)
-    
-    -- addon:debug("Finished hiding spell cast animation frames")
 end
 
-function addon.updateUI.hideMacroText()
-    -- addon:debug("Hiding macro text on action buttons")
-    
-    local function hideButtonMacroText(button, buttonName)
-        if button and button.Name then
-            button.Name:SetAlpha(0)
-            button.Name:Hide()
-            -- Hook to keep it hidden without overriding Show()
-            hooksecurefunc(button.Name, "Show", function(self)
+-- ===========================================================================
+-- FRAME HIDING: CHAT FRAME CHANNEL BUTTON
+-- ===========================================================================
+
+do
+    function addon.updateUI.HideChatFrameChannelButton()
+        if ChatFrameChannelButton then
+            ChatFrameChannelButton:Hide()
+            ChatFrameChannelButton:SetAlpha(0)
+            
+            hooksecurefunc(ChatFrameChannelButton, "Show", function(self)
+                self:Hide()
                 self:SetAlpha(0)
             end)
-            -- addon:debug("Hid macro text for: " .. buttonName)
         end
     end
-    
-    -- Iterate over all action buttons using the shared helper
-    addon:IterateActionButtons(hideButtonMacroText)
-    
-    -- addon:debug("Finished hiding macro text")
 end
 
-function addon.updateUI.hideKeybindText()
-    -- addon:debug("Hiding keybind text on action buttons")
-    
-    local function hideButtonKeybind(button, buttonName)
-        if button and button.HotKey then
-            button.HotKey:SetAlpha(0)
-            button.HotKey:Hide()
-            -- Hook to keep it hidden without overriding Show()
-            hooksecurefunc(button.HotKey, "Show", function(self)
-                self:SetAlpha(0)
-            end)
-            -- addon:debug("Hid keybind text for: " .. buttonName)
-        end
+-- ===========================================================================
+-- CVAR SETTINGS
+-- ===========================================================================
+
+do
+    function addon.updateUI.SetCVars()
+        SetCVar("mapFade", 0)
     end
-    
-    -- Iterate over all action buttons using the shared helper
-    addon:IterateActionButtons(hideButtonKeybind)
-    
-    -- addon:debug("Finished hiding keybind text")
 end
 
-function addon.updateUI.setCVars()
-    -- addon:debug("Setting CVars")
-    
-    SetCVar("mapFade", 0)
-    -- addon:debug("Set mapFade to 0")
-    
-    -- addon:debug("Finished setting CVars")
-end
+-- ===========================================================================
+-- BATTLEFIELD MAP CUSTOMIZATION
+-- ===========================================================================
 
-function addon.updateUI.addActionButtonBorders()
-    -- addon:debug("Adding borders to action buttons")
-    
-    local function addButtonBorder(button, buttonName)
-        if button then
-            -- Hide the default rounded border texture
-            local normalTexture = button:GetNormalTexture()
-            if normalTexture then
-                normalTexture:SetAlpha(0)
-                normalTexture:Hide()
-            end
-            
-            -- Also hide the NormalTexture2 if it exists
-            if button.NormalTexture then
-                button.NormalTexture:SetAlpha(0)
-                button.NormalTexture:Hide()
-            end
-            
-            addon:addBorder(button)
-            -- addon:debug("Added border to: " .. buttonName)
-        end
-    end
-    
-    -- Iterate over all action buttons using the shared helper
-    addon:IterateActionButtons(addButtonBorder)
-    
-    -- addon:debug("Finished adding borders to action buttons")
-end
-
-function addon.updateUI.setButtonPadding()
-    -- addon:debug("Setting button padding on action bars")
-    
-    local padding = addon.vars.buttonPadding
-    
-    -- Map button prefixes to their parent bar frames
-    local barMap = {
-        ActionButton = MainMenuBar,
-        MultiBarBottomLeftButton = MultiBarBottomLeft,
-        MultiBarBottomRightButton = MultiBarBottomRight,
-        MultiBarRightButton = MultiBarRight,
-        MultiBarLeftButton = MultiBarLeft,
-        MultiBar5Button = MultiBar5,
-        MultiBar6Button = MultiBar6,
-        MultiBar7Button = MultiBar7,
-    }
-    
-    -- Set spacing on each bar's layout system
-    for prefix, bar in pairs(barMap) do
-        if bar then
-            -- Set the button spacing attribute that Blizzard's layout system uses
-            if bar.SetAttribute then
-                bar:SetAttribute("buttonSpacing", padding)
-                -- addon:debug("Set buttonSpacing for: " .. (bar:GetName() or prefix))
-            end
-            
-            -- Hook the bar's layout refresh to apply our spacing
-            if bar.UpdateGridLayout then
-                hooksecurefunc(bar, "UpdateGridLayout", function(self)
-                    if self.SetAttribute then
-                        self:SetAttribute("buttonSpacing", padding)
-                    end
-                end)
-            end
-            
-            -- Trigger a layout update to apply changes immediately
-            if bar.UpdateGridLayout then
-                bar:UpdateGridLayout()
-            elseif bar.Layout then
-                bar:Layout()
-            end
-        end
-    end
-    
-    -- addon:debug("Finished setting button padding (Blizzard layout system will handle positioning)")
-end
-
-function addon.updateUI.zoomButtonIcons()
-    -- addon:debug("Zooming button icons on action bars")
-    
-    local zoom = addon.vars.iconZoom
-    local inset = zoom / 2
-    
-    local function zoomButtonIcon(button, buttonName)
-        if button and button.icon then
-            -- Crop the texture edges to create a zoom effect
-            button.icon:SetTexCoord(inset, 1 - inset, inset, 1 - inset)
-            
-            -- Make the cooldown frame fill the entire button (not inset like the icon)
-            if button.cooldown then
-                button.cooldown:ClearAllPoints()
-                button.cooldown:SetAllPoints(button)
-            end
-            
-            -- addon:debug("Zoomed icon for: " .. buttonName .. " by " .. (zoom * 100) .. "%")
-        end
-    end
-    
-    -- Iterate over all action buttons using the shared helper
-    addon:IterateActionButtons(zoomButtonIcon)
-    
-    -- addon:debug("Finished zooming button icons")
-end
-
-function addon.updateUI.customizeAssistedHighlightGlow()
-    -- addon:debug("Customizing assisted highlight glow on action buttons")
-    
-    -- Function to update the assisted highlight flipbook
-    local function UpdateAssistedHighlight(actionButton, shown)
-        local highlightFrame = actionButton.AssistedCombatHighlightFrame
-        
-        -- Only show the glow if in combat
-        local inCombat = UnitAffectingCombat("player")
-        
-        if highlightFrame and highlightFrame:IsVisible() and shown and inCombat then
-            local flipbook = highlightFrame.Flipbook
-            if flipbook then
-                -- Set to Modern Blizzard Glow style
-                flipbook:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
-                
-                -- Desaturate the texture first (converts to grayscale)
-                flipbook:SetDesaturated(true)
-                
-                -- Apply magenta color (#ff00ff)
-                flipbook:SetVertexColor(1.0, 0.0, 1.0, 1.0) -- RGB: 1.0, 0.0, 1.0 = #ff00ff
-                
-                -- Get the flipbook animation
-                local anim = flipbook.Anim:GetAnimations()
-                if anim then
-                    -- Configure the animation for Modern Blizzard Glow
-                    flipbook:ClearAllPoints()
-                    flipbook:SetSize(flipbook:GetSize())
-                    flipbook:SetPoint("CENTER", highlightFrame, "CENTER", -1.5, 1)
-                    
-                    -- Restart the animation
-                    flipbook.Anim:Stop()
-                    flipbook.Anim:Play()
+do
+    function addon.updateUI.CustomizeBattlefieldMap()
+        local mapFrame = BattlefieldMapFrame
+        if mapFrame then
+            hooksecurefunc(mapFrame, "Show", function()
+                if mapFrame.BorderFrame then
+                    mapFrame.BorderFrame:Hide()
+                    mapFrame.BorderFrame:SetAlpha(0)
                 end
                 
-                -- addon:debug("Updated assisted highlight glow for button: " .. (actionButton:GetName() or "unknown"))
-            end
-        elseif highlightFrame and not inCombat then
-            -- Hide the glow when out of combat
-            highlightFrame:Hide()
-        end
-    end
-    
-    -- Hook the assisted combat manager
-    if AssistedCombatManager then
-        hooksecurefunc(AssistedCombatManager, "SetAssistedHighlightFrameShown", function(self, actionButton, shown)
-            UpdateAssistedHighlight(actionButton, shown)
-        end)
-        -- addon:debug("Hooked AssistedCombatManager.SetAssistedHighlightFrameShown")
-    else
-        -- addon:debug("WARNING: AssistedCombatManager not found")
-    end
-    
-    -- addon:debug("Finished customizing assisted highlight glow")
-end
-
-function addon.updateUI.customizeProcGlow()
-    -- addon:debug("Hiding proc glow on action buttons")
-    
-    -- First, hide any proc glows that are already showing
-    addon:IterateActionButtons(function(button, buttonName)
-        if button and button.SpellActivationAlert then
-            button.SpellActivationAlert:Hide()
-            button.SpellActivationAlert:SetAlpha(0)
+                if mapFrame.ScrollContainer then
+                    if not mapFrame.ScrollContainer.SAdUI_BorderFrame then
+                        local borderFrame = CreateFrame("Frame", nil, mapFrame.ScrollContainer)
+                        borderFrame:SetAllPoints(mapFrame.ScrollContainer)
+                        mapFrame.ScrollContainer.SAdUI_BorderFrame = borderFrame
+                    end
+                    addon:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
+                end
+            end)
             
-            -- Hook Show to keep it hidden
-            if not button.SpellActivationAlert.__SAdUI_HideHooked then
-                button.SpellActivationAlert.__SAdUI_HideHooked = true
-                hooksecurefunc(button.SpellActivationAlert, "Show", function(self)
-                    self:Hide()
-                    self:SetAlpha(0)
-                end)
-            end
-        end
-    end)
-    
-    -- Also hook the ActionButtonSpellAlertManager ShowAlert function
-    if ActionButtonSpellAlertManager and not ActionButtonSpellAlertManager.__SAdUI_Hooked then
-        ActionButtonSpellAlertManager.__SAdUI_Hooked = true
-        hooksecurefunc(ActionButtonSpellAlertManager, "ShowAlert", function(self, actionButton)
-            -- Make sure we have a valid button
-            if type(actionButton) ~= "table" then
-                actionButton = self
-            end
-            
-            if actionButton and actionButton.SpellActivationAlert then
-                actionButton.SpellActivationAlert:Hide()
-                actionButton.SpellActivationAlert:SetAlpha(0)
-            end
-        end)
-        -- addon:debug("Hooked ActionButtonSpellAlertManager.ShowAlert to hide proc glows")
-    end
-    
-    -- addon:debug("Finished hiding proc glow")
-end
-
-function addon.updateUI.customizeBattlefieldMap()
-    -- addon:debug("Customizing battlefield map border")
-    
-    local mapFrame = BattlefieldMapFrame
-    if mapFrame then
-        -- Hook the Show function to apply our customizations when the map is displayed
-        hooksecurefunc(mapFrame, "Show", function()
-            -- Hide the default border
-            if mapFrame.BorderFrame then
-                mapFrame.BorderFrame:Hide()
-                mapFrame.BorderFrame:SetAlpha(0)
-            end
-            
-            -- Create overlay frame and add custom border
-            if mapFrame.ScrollContainer then
+            if mapFrame:IsShown() and mapFrame.ScrollContainer then
+                if mapFrame.BorderFrame then
+                    mapFrame.BorderFrame:Hide()
+                    mapFrame.BorderFrame:SetAlpha(0)
+                end
+                
                 if not mapFrame.ScrollContainer.SAdUI_BorderFrame then
                     local borderFrame = CreateFrame("Frame", nil, mapFrame.ScrollContainer)
                     borderFrame:SetAllPoints(mapFrame.ScrollContainer)
@@ -440,413 +204,644 @@ function addon.updateUI.customizeBattlefieldMap()
                 end
                 addon:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
             end
-        end)
+        end
+    end
+    
+    function addon.updateUI.ScaleZoneMap()
+        local scale = 1.25
+        local mapFrame = BattlefieldMapFrame
+        if mapFrame then
+            mapFrame:SetScale(scale)
+        end
+    end
+end
+
+-- ===========================================================================
+-- MINIMAP CUSTOMIZATION
+-- ===========================================================================
+
+do
+    function addon.updateUI.CustomizeMinimap()
+        local minimapWidth = 373
+        local minimapHeight = 248
         
-        -- Apply immediately if the map is already showing
-        if mapFrame:IsShown() and mapFrame.ScrollContainer then
-            if mapFrame.BorderFrame then
-                mapFrame.BorderFrame:Hide()
-                mapFrame.BorderFrame:SetAlpha(0)
-            end
-            
-            if not mapFrame.ScrollContainer.SAdUI_BorderFrame then
-                local borderFrame = CreateFrame("Frame", nil, mapFrame.ScrollContainer)
-                borderFrame:SetAllPoints(mapFrame.ScrollContainer)
-                mapFrame.ScrollContainer.SAdUI_BorderFrame = borderFrame
-            end
-            addon:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
+        if Minimap then
+            Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
+            Minimap:SetSize(minimapWidth, minimapHeight)
+            addon:addBorder(Minimap)
         end
-    end
-    
-    -- addon:debug("Finished customizing battlefield map")
-end
-
-function addon.updateUI.scaleZoneMap()
-    -- addon:debug("Scaling zone map")
-    
-    local scale = 1.25
-    
-    local mapFrame = BattlefieldMapFrame
-    if mapFrame then
-        mapFrame:SetScale(scale)
-        -- addon:debug("Set zone map scale to: " .. tostring(scale))
-    end
-    
-    -- addon:debug("Finished scaling zone map")
-end
-
-function addon.updateUI.unclampChatFrames()
-    -- addon:debug("Unclamping chat frames from screen")
-    
-    for i = 1, NUM_CHAT_WINDOWS do
-        local chatFrame = _G["ChatFrame" .. i]
-        if chatFrame then
-            chatFrame:SetClampedToScreen(false)
-            -- addon:debug("Unclamped ChatFrame" .. i)
+        
+        if MinimapBackdrop then
+            MinimapBackdrop:Hide()
+            MinimapBackdrop:SetAlpha(0)
         end
-    end
-    
-    -- addon:debug("Finished unclamping chat frames")
-end
-
-function addon.updateUI.repositionChatEditBox()
-    -- addon:debug("Repositioning chat edit boxes")
-    
-    for i = 1, NUM_CHAT_WINDOWS do
-        local editBox = _G["ChatFrame" .. i .. "EditBox"]
-        if editBox then
-            editBox:ClearAllPoints()
-            editBox:SetPoint("TOPLEFT", _G["ChatFrame" .. i], "BOTTOMLEFT", 0, 25)
-            editBox:SetPoint("TOPRIGHT", _G["ChatFrame" .. i], "BOTTOMRIGHT", 0, 0)
+        
+        if MinimapCluster and MinimapCluster.BorderTop then
+            MinimapCluster.BorderTop:Hide()
+            MinimapCluster.BorderTop:SetAlpha(0)
+        end
+        
+        if MinimapCluster and MinimapCluster.Tracking then
+            if MinimapCluster.Tracking.Button then
+                MinimapCluster.Tracking.Button:Hide()
+                MinimapCluster.Tracking.Button:SetAlpha(0)
+            end
+            if MinimapCluster.Tracking.Background then
+                MinimapCluster.Tracking.Background:Hide()
+                MinimapCluster.Tracking.Background:SetAlpha(0)
+            end
+        end
+        
+        if MinimapCluster and MinimapCluster.ZoneTextButton then
+            MinimapCluster.ZoneTextButton:Hide()
+            MinimapCluster.ZoneTextButton:SetAlpha(0)
             
-            -- Hide all border textures
-            for j = 1, editBox:GetNumRegions() do
-                local region = select(j, editBox:GetRegions())
-                if region and region:GetObjectType() == "Texture" then
-                    region:SetAlpha(0)
+            for i = 1, MinimapCluster.ZoneTextButton:GetNumRegions() do
+                local region = select(i, MinimapCluster.ZoneTextButton:GetRegions())
+                if region then
                     region:Hide()
+                    region:SetAlpha(0)
                 end
             end
-            
-            -- Add black background texture
-            if not editBox.SAdUI_Background then
-                editBox.SAdUI_Background = editBox:CreateTexture(nil, "BACKGROUND")
-                editBox.SAdUI_Background:SetAllPoints(editBox)
-                editBox.SAdUI_Background:SetColorTexture(0, 0, 0, 1)
-                
-                -- Hook SetShown to sync background visibility
-                hooksecurefunc(editBox, "SetShown", function(self, shown)
-                    if self.SAdUI_Background then
-                        self.SAdUI_Background:SetShown(shown)
-                    end
+        end
+        
+        if GameTimeFrame then
+            GameTimeFrame:Hide()
+            GameTimeFrame:SetAlpha(0)
+        end
+        
+        if Minimap then
+            if Minimap.ZoomIn then
+                Minimap.ZoomIn:Hide()
+                Minimap.ZoomIn:SetAlpha(0)
+            end
+            if Minimap.ZoomOut then
+                Minimap.ZoomOut:Hide()
+                Minimap.ZoomOut:SetAlpha(0)
+            end
+        end
+        
+        if MinimapZoomIn then
+            MinimapZoomIn:Hide()
+            MinimapZoomIn:SetAlpha(0)
+        end
+        if MinimapZoomOut then
+            MinimapZoomOut:Hide()
+            MinimapZoomOut:SetAlpha(0)
+        end
+        
+        if Minimap then
+            C_Timer.After(0.1, function()
+                local currentZoom = Minimap:GetZoom()
+                if currentZoom < Minimap:GetZoomLevels() then
+                    Minimap:SetZoom(currentZoom + 1)
+                else
+                    Minimap:SetZoom(currentZoom - 1)
+                end
+                C_Timer.After(0.05, function()
+                    Minimap:SetZoom(currentZoom)
                 end)
-                
-                hooksecurefunc(editBox, "SetAlpha", function(self, alpha)
-                    if self.SAdUI_Background then
-                        self.SAdUI_Background:SetAlpha(alpha)
-                    end
-                end)
-            end
-            
-            -- Sync initial visibility and alpha
-            if editBox.SAdUI_Background then
-                editBox.SAdUI_Background:SetShown(editBox:IsShown())
-                editBox.SAdUI_Background:SetAlpha(editBox:GetAlpha())
-            end
-            
-            -- addon:debug("Repositioned ChatFrame" .. i .. "EditBox")
-        end
-    end
-    
-    -- addon:debug("Finished repositioning chat edit boxes")
-end
-
-function addon.updateUI.customizeMinimap()
-    -- addon:debug("Customizing minimap")
-    
-    -- Minimap dimensions (adjustable)
-    local minimapWidth = 373
-    local minimapHeight = 248
-    
-    -- Make minimap rectangular and set size
-    if Minimap then
-        -- Remove the circular mask to make it rectangular
-        Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
-        
-        -- Set custom size
-        Minimap:SetSize(minimapWidth, minimapHeight)
-        
-        -- Add border
-        addon:addBorder(Minimap)
-    end
-    
-    -- Hide MinimapBackdrop
-    if MinimapBackdrop then
-        MinimapBackdrop:Hide()
-        MinimapBackdrop:SetAlpha(0)
-    end
-    
-    -- Hide BorderTop
-    if MinimapCluster and MinimapCluster.BorderTop then
-        MinimapCluster.BorderTop:Hide()
-        MinimapCluster.BorderTop:SetAlpha(0)
-    end
-    
-    -- Hide Tracking button and background
-    if MinimapCluster and MinimapCluster.Tracking then
-        if MinimapCluster.Tracking.Button then
-            MinimapCluster.Tracking.Button:Hide()
-            MinimapCluster.Tracking.Button:SetAlpha(0)
-        end
-        if MinimapCluster.Tracking.Background then
-            MinimapCluster.Tracking.Background:Hide()
-            MinimapCluster.Tracking.Background:SetAlpha(0)
-        end
-    end
-    
-    -- Hide Zone text and background
-    if MinimapCluster and MinimapCluster.ZoneTextButton then
-        MinimapCluster.ZoneTextButton:Hide()
-        MinimapCluster.ZoneTextButton:SetAlpha(0)
-        
-        -- Hide all regions (backgrounds) of ZoneTextButton
-        for i = 1, MinimapCluster.ZoneTextButton:GetNumRegions() do
-            local region = select(i, MinimapCluster.ZoneTextButton:GetRegions())
-            if region then
-                region:Hide()
-                region:SetAlpha(0)
-            end
-        end
-    end
-    
-    -- Hide Calendar button
-    if GameTimeFrame then
-        GameTimeFrame:Hide()
-        GameTimeFrame:SetAlpha(0)
-    end
-    
-    -- Hide Zoom In/Out buttons
-    if Minimap then
-        if Minimap.ZoomIn then
-            Minimap.ZoomIn:Hide()
-            Minimap.ZoomIn:SetAlpha(0)
-        end
-        if Minimap.ZoomOut then
-            Minimap.ZoomOut:Hide()
-            Minimap.ZoomOut:SetAlpha(0)
-        end
-    end
-    
-    -- Also hide global zoom buttons if they exist
-    if MinimapZoomIn then
-        MinimapZoomIn:Hide()
-        MinimapZoomIn:SetAlpha(0)
-    end
-    if MinimapZoomOut then
-        MinimapZoomOut:Hide()
-        MinimapZoomOut:SetAlpha(0)
-    end
-    
-    -- Force minimap to recenter by triggering a zoom operation
-    if Minimap then
-        C_Timer.After(0.1, function()
-            local currentZoom = Minimap:GetZoom()
-            -- Zoom out then back in to force recenter
-            if currentZoom < Minimap:GetZoomLevels() then
-                Minimap:SetZoom(currentZoom + 1)
-            else
-                Minimap:SetZoom(currentZoom - 1)
-            end
-            -- Restore original zoom level
-            C_Timer.After(0.05, function()
-                Minimap:SetZoom(currentZoom)
             end)
-        end)
+        end
     end
-    
-    -- addon:debug("Finished customizing minimap")
 end
 
-function addon.updateUI.customizeClock()
-    -- addon:debug("Customizing clock")
-    
-    local clockButton = TimeManagerClockButton
-    if clockButton then
-        -- Reposition to center top of screen
-        clockButton:ClearAllPoints()
-        clockButton:SetPoint("TOP", UIParent, "TOP", 0, -10)
+-- ===========================================================================
+-- CLOCK CUSTOMIZATION
+-- ===========================================================================
+
+do
+    function addon.updateUI.CustomizeClock()
+        local clockButton = TimeManagerClockButton
+        if clockButton then
+            clockButton:ClearAllPoints()
+            clockButton:SetPoint("TOP", UIParent, "TOP", 0, -10)
+            
+            local ticker = TimeManagerClockTicker
+            if ticker then
+                ticker:SetFont(ticker:GetFont(), 18, "OUTLINE")
+                ticker:SetJustifyH("CENTER")
+            end
+        end
         
-        -- Make the text bigger and center aligned
-        local ticker = TimeManagerClockTicker
-        if ticker then
-            ticker:SetFont(ticker:GetFont(), 18, "OUTLINE")
-            ticker:SetJustifyH("CENTER")
+        if AddonCompartmentFrame and clockButton then
+            AddonCompartmentFrame:ClearAllPoints()
+            AddonCompartmentFrame:SetPoint("LEFT", clockButton, "RIGHT", 15, 0)
+        end
+    end
+end
+
+-- ===========================================================================
+-- CHAT FRAME CUSTOMIZATIONS
+-- ===========================================================================
+
+do
+    function addon.updateUI.unclampChatFrames()
+        for i = 1, NUM_CHAT_WINDOWS do
+            local chatFrame = _G["ChatFrame" .. i]
+            if chatFrame then
+                chatFrame:SetClampedToScreen(false)
+            end
         end
     end
     
-    -- Position addon compartment to the right of clock
-    if AddonCompartmentFrame and clockButton then
-        AddonCompartmentFrame:ClearAllPoints()
-        AddonCompartmentFrame:SetPoint("LEFT", clockButton, "RIGHT", 15, 0)
-    end
-    
-    -- addon:debug("Finished customizing clock")
-end
-
-function addon:addBorder(bar)
-    if not bar then return end
-    
-    local size = self.vars.borderWidth
-    local colorHex = self.vars.borderColor
-    local r, g, b, a = self:hexToRGB(colorHex)
-    
-    local borders = bar.SAdUnitFrames_Borders
-    
-    if borders then
-        borders.top:SetColorTexture(r, g, b, a)
-        borders.top:SetHeight(size)
-        
-        borders.bottom:SetColorTexture(r, g, b, a)
-        borders.bottom:SetHeight(size)
-        
-        borders.left:SetColorTexture(r, g, b, a)
-        borders.left:SetWidth(size)
-        
-        borders.right:SetColorTexture(r, g, b, a)
-        borders.right:SetWidth(size)
-    else
-        borders = {}
-        
-        borders.top = bar:CreateTexture(nil, "OVERLAY")
-        borders.top:SetColorTexture(r, g, b, a)
-        borders.top:SetHeight(size)
-        borders.top:ClearAllPoints()
-        borders.top:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
-        borders.top:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-        
-        borders.bottom = bar:CreateTexture(nil, "OVERLAY")
-        borders.bottom:SetColorTexture(r, g, b, a)
-        borders.bottom:SetHeight(size)
-        borders.bottom:ClearAllPoints()
-        borders.bottom:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-        borders.bottom:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-        
-        borders.left = bar:CreateTexture(nil, "OVERLAY")
-        borders.left:SetColorTexture(r, g, b, a)
-        borders.left:SetWidth(size)
-        borders.left:ClearAllPoints()
-        borders.left:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
-        borders.left:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-        
-        borders.right = bar:CreateTexture(nil, "OVERLAY")
-        borders.right:SetColorTexture(r, g, b, a)
-        borders.right:SetWidth(size)
-        borders.right:ClearAllPoints()
-        borders.right:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-        borders.right:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-        
-        bar.SAdUnitFrames_Borders = borders
-    end
-end
-
-function addon.updateUI.addBuffIconGlow()
-    local function OnUnitAura(event, unit)
-        if unit ~= "player" then return end
-        
-        if BuffIconCooldownViewer then
-            for _, child in pairs({BuffIconCooldownViewer:GetChildren()}) do
-                if child.Icon and not child.SAdUI_ProcGlow then
-                    -- Create proc glow frame manually
-                    local procGlow = CreateFrame("Frame", nil, child)
-                    procGlow:SetSize(child:GetWidth() * 1.4, child:GetHeight() * 1.4)
-                    procGlow:SetPoint("CENTER")
+    function addon.updateUI.repositionChatEditBox()
+        for i = 1, NUM_CHAT_WINDOWS do
+            local editBox = _G["ChatFrame" .. i .. "EditBox"]
+            if editBox then
+                editBox:ClearAllPoints()
+                editBox:SetPoint("TOPLEFT", _G["ChatFrame" .. i], "BOTTOMLEFT", 0, 25)
+                editBox:SetPoint("TOPRIGHT", _G["ChatFrame" .. i], "BOTTOMRIGHT", 0, 0)
+                
+                for j = 1, editBox:GetNumRegions() do
+                    local region = select(j, editBox:GetRegions())
+                    if region and region:GetObjectType() == "Texture" then
+                        region:SetAlpha(0)
+                        region:Hide()
+                    end
+                end
+                
+                if not editBox.SAdUI_Background then
+                    editBox.SAdUI_Background = editBox:CreateTexture(nil, "BACKGROUND")
+                    editBox.SAdUI_Background:SetAllPoints(editBox)
+                    editBox.SAdUI_Background:SetColorTexture(0, 0, 0, 1)
                     
-                    -- Create proc loop flipbook texture (the continuous glow)
-                    local procLoop = procGlow:CreateTexture(nil, "ARTWORK")
-                    procLoop:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
-                    procLoop:SetAllPoints(procGlow)
-                    procLoop:SetAlpha(0)
-                    procLoop:SetDesaturated(true)
-                    procLoop:SetVertexColor(1, 0, 1)
-                    procGlow.ProcLoopFlipbook = procLoop
+                    hooksecurefunc(editBox, "SetShown", function(self, shown)
+                        if self.SAdUI_Background then
+                            self.SAdUI_Background:SetShown(shown)
+                        end
+                    end)
                     
-                    -- Create animation group for proc loop
-                    local procLoopAnim = procGlow:CreateAnimationGroup()
-                    procLoopAnim:SetLooping("REPEAT")
-                    
-                    local alpha = procLoopAnim:CreateAnimation("Alpha")
-                    alpha:SetChildKey("ProcLoopFlipbook")
-                    alpha:SetDuration(0.001)
-                    alpha:SetOrder(0)
-                    alpha:SetFromAlpha(1)
-                    alpha:SetToAlpha(1)
-                    
-                    local flip = procLoopAnim:CreateAnimation("FlipBook")
-                    flip:SetChildKey("ProcLoopFlipbook")
-                    flip:SetDuration(1)
-                    flip:SetOrder(0)
-                    flip:SetFlipBookRows(6)
-                    flip:SetFlipBookColumns(5)
-                    flip:SetFlipBookFrames(30)
-                    
-                    procGlow.ProcLoop = procLoopAnim
-                    
-                    -- Play the loop animation
-                    procLoopAnim:Play()
-                    
-                    child.SAdUI_ProcGlow = procGlow
+                    hooksecurefunc(editBox, "SetAlpha", function(self, alpha)
+                        if self.SAdUI_Background then
+                            self.SAdUI_Background:SetAlpha(alpha)
+                        end
+                    end)
+                end
+                
+                if editBox.SAdUI_Background then
+                    editBox.SAdUI_Background:SetShown(editBox:IsShown())
+                    editBox.SAdUI_Background:SetAlpha(editBox:GetAlpha())
                 end
             end
         end
     end
-    
-    addon:RegisterEvent("UNIT_AURA", OnUnitAura)
 end
 
-function addon:OnPlayerEnteringWorld()
-    -- addon:debug("PLAYER_ENTERING_WORLD event fired")
-    addon:RunUIUpdates()
-end
+-- ===========================================================================
+-- BUFF ICON GLOW (GREEN PROC GLOW)
+-- ===========================================================================
 
-function addon:OnPlayerRegenEnabled()
-    -- addon:debug("Leaving combat")
-    
-    -- Hide all assisted highlight glows when leaving combat
-    addon:UpdateAssistedHighlightVisibility()
-    
-    if addon.pendingUIUpdate then
-        -- addon:debug("Running pending UI updates after combat")
-        addon.pendingUIUpdate = false
-        addon:RunUIUpdates()
-    end
-end
-
-function addon:OnPlayerRegenDisabled()
-    -- addon:debug("Entering combat")
-    
-    -- Show assisted highlight glows when entering combat (if they should be visible)
-    addon:UpdateAssistedHighlightVisibility()
-end
-
-function addon:UpdateAssistedHighlightVisibility()
-    local inCombat = UnitAffectingCombat("player")
-    
-    addon:IterateActionButtons(function(button, buttonName)
-        if button and button.AssistedCombatHighlightFrame then
-            local highlightFrame = button.AssistedCombatHighlightFrame
-            if not inCombat then
-                -- Force hide when out of combat
-                highlightFrame:Hide()
-            end
-            -- When in combat, let the normal assisted combat system handle visibility
-        end
-    end)
-end
-
-function addon:RunUIUpdates()
-    if InCombatLockdown() then
-        -- addon:debug("In combat lockdown - deferring UI updates")
-        addon.pendingUIUpdate = true
-        return
-    end
-    
-    -- Delay UI updates to ensure Blizzard UI is fully loaded and to avoid tainting during initialization
-    C_Timer.After(0.5, function()
-        if InCombatLockdown() then
-            -- addon:debug("In combat after delay - deferring UI updates")
-            addon.pendingUIUpdate = true
-            return
+do
+    local function CreateProcGlow(parent, r, g, b)
+        local procGlow = CreateFrame("Frame", nil, parent)
+        procGlow:SetSize(parent:GetWidth() * 1.4, parent:GetHeight() * 1.4)
+        procGlow:SetPoint("CENTER")
+        
+        local procLoop = procGlow:CreateTexture(nil, "ARTWORK")
+        procLoop:SetAtlas("UI-HUD-ActionBar-Proc-Loop-Flipbook")
+        procLoop:SetAllPoints(procGlow)
+        procLoop:SetAlpha(0)
+        
+        if r ~= nil and g ~= nil and b ~= nil then
+            procLoop:SetDesaturated(true)
+            procLoop:SetVertexColor(r, g, b)
         end
         
-        -- addon:debug("Running all updateUI functions")
-        for funcName, func in pairs(addon.updateUI) do
-            -- addon:debug("Found updateUI entry: " .. funcName .. " (type: " .. type(func) .. ")")
-            if type(func) == "function" then
-                -- addon:debug("Running updateUI." .. funcName)
-                func()
-                -- addon:debug("Completed updateUI." .. funcName)
+        procGlow.ProcLoopFlipbook = procLoop
+        
+        local procLoopAnim = procGlow:CreateAnimationGroup()
+        procLoopAnim:SetLooping("REPEAT")
+        
+        local alpha = procLoopAnim:CreateAnimation("Alpha")
+        alpha:SetChildKey("ProcLoopFlipbook")
+        alpha:SetDuration(0.001)
+        alpha:SetOrder(0)
+        alpha:SetFromAlpha(1)
+        alpha:SetToAlpha(1)
+        
+        local flip = procLoopAnim:CreateAnimation("FlipBook")
+        flip:SetChildKey("ProcLoopFlipbook")
+        flip:SetDuration(1)
+        flip:SetOrder(0)
+        flip:SetFlipBookRows(6)
+        flip:SetFlipBookColumns(5)
+        flip:SetFlipBookFrames(30)
+        
+        procGlow.ProcLoop = procLoopAnim
+        
+        return procGlow
+    end
+    
+    function addon.updateUI.addBuffIconGlow()
+        local function OnUnitAura(event, unit)
+            if unit ~= "player" then return end
+            
+            if BuffIconCooldownViewer then
+                for _, child in pairs({BuffIconCooldownViewer:GetChildren()}) do
+                    if child.Icon and not child.SAdUI_ProcGlow then
+                        local procGlow = CreateProcGlow(child, 0, 1.0, 0.596)
+                        procGlow.ProcLoop:Play()
+                        child.SAdUI_ProcGlow = procGlow
+                    end
+                end
             end
         end
-        -- addon:debug("Finished running all updateUI functions")
-    end)
+        
+        addon:RegisterEvent("UNIT_AURA", OnUnitAura)
+    end
 end
+
+-- ===========================================================================
+-- ESSENTIAL COOLDOWN VIEWER: COOLDOWN OVERLAY COLOR
+-- ===========================================================================
+
+-- do
+--     function addon.customizeEssentialCooldowns()
+--         local function ApplyCooldownColor(cooldownFrame)
+--             if cooldownFrame and cooldownFrame.SetSwipeColor then
+--                 cooldownFrame:SetSwipeColor(0, 0, 0, 1)
+--             end
+--         end
+        
+--         local function CustomizeChargeCount(child)
+--             if not child or not child.ChargeCount then return end
+            
+--             local chargeCount = child.ChargeCount
+            
+--             -- ChargeCount might be a frame with a Current child fontstring
+--             local textRegion = nil
+            
+--             if chargeCount.Current then
+--                 textRegion = chargeCount.Current
+--             elseif chargeCount:GetObjectType() == "FontString" then
+--                 textRegion = chargeCount
+--             else
+--                 -- Search for fontstring child
+--                 for i = 1, chargeCount:GetNumRegions() do
+--                     local region = select(i, chargeCount:GetRegions())
+--                     if region and region:GetObjectType() == "FontString" then
+--                         textRegion = region
+--                         break
+--                     end
+--                 end
+--             end
+            
+--             if textRegion and textRegion:GetObjectType() == "FontString" then
+--                 -- Raise frame strata
+--                 if chargeCount.SetFrameStrata then
+--                     chargeCount:SetFrameStrata("HIGH")
+--                 end
+                
+--                 -- Add black background with soft edges if it doesn't exist
+--                 if not chargeCount.SAdUI_Background then
+--                     -- Try different textures (uncomment one):
+                    
+--                     local bg = chargeCount:CreateTexture(nil, "BACKGROUND")
+--                     bg:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+--                     bg:SetVertexColor(0, 0, 0, 1)
+--                     bg:SetPoint("CENTER", textRegion, "CENTER", 0, 0)
+--                     bg:SetSize(30, 30)
+--                     chargeCount.SAdUI_Background = bg
+                    
+--                 end
+                
+--                 -- Make it larger and set color to #FFBB00 (orange/gold)
+--                 local fontPath, _, fontFlags = textRegion:GetFont()
+--                 if fontPath then
+--                     textRegion:SetFont(fontPath, 20, fontFlags)
+--                 end
+                
+--                 -- -- Set color to #FFBB00
+--                 -- textRegion:SetTextColor(1.0, 0.733, 0.0)  -- RGB for #FFBB00
+                
+--                 -- Position at the top of the parent frame
+--                 textRegion:ClearAllPoints()
+--                 textRegion:SetPoint("CENTER", child, "CENTER", 0, 0)
+--                 textRegion:SetJustifyH("CENTER")
+--                 textRegion:SetJustifyV("TOP")
+--             end
+--         end
+        
+--         local function SetupCooldownHooks()
+--             if not EssentialCooldownViewer then
+--                 return
+--             end
+            
+--             for _, child in pairs({EssentialCooldownViewer:GetChildren()}) do
+--                 if child.Cooldown and not child.cooldownHooked then
+--                     hooksecurefunc(child.Cooldown, "SetCooldown", function(self)
+--                         ApplyCooldownColor(self)
+--                     end)
+                    
+--                     ApplyCooldownColor(child.Cooldown)
+                    
+--                     child.cooldownHooked = true
+--                 end
+                
+--                 -- Customize charge count for this child
+--                 if not child.chargeCountHooked then
+--                     CustomizeChargeCount(child)
+--                     child.chargeCountHooked = true
+--                 end
+--             end
+--         end
+        
+--         C_Timer.After(1, SetupCooldownHooks)
+--         C_Timer.NewTicker(5, SetupCooldownHooks)
+--     end
+-- end
+
+-- ===========================================================================
+-- ESSENTIAL COOLDOWN VIEWER: FLASH ANIMATION CUSTOMIZATION
+-- ===========================================================================
+-- Replace the default tiny flash with more visible WoW action bar animations.
+-- Options: Proc Start (burst), Interrupt Display (animated ring), or Spell Fill (pulsing).
+-- ===========================================================================
+
+-- do
+--     function addon.customizeEssentialCooldownFlash()
+--         if not EssentialCooldownViewer then
+--             return
+--         end
+        
+--         for i, child in pairs({EssentialCooldownViewer:GetChildren()}) do
+--             if child.CooldownFlash and child.CooldownFlash.Flipbook then
+--                 local fb = child.CooldownFlash.Flipbook
+                
+--                 -- Hook CooldownFlash Show to modify the dynamically created animation
+--                 if not child.CooldownFlash.SAdUI_ShowHooked then
+--                     child.CooldownFlash.SAdUI_ShowHooked = true
+--                     hooksecurefunc(child.CooldownFlash, "Show", function()
+-- -- Available Methods on Flipbook Texture Object:
+-- -- TEXTURE METHODS:
+-- --   SetAtlas, GetAtlas, SetTexture, GetTexture, SetColorTexture
+-- --   GetTextureSliceMode, SetTextureSliceMode, GetTextureFilePath, GetTextureFileID
+-- --   ClearTextureSlice, SetDesaturated, GetDesaturation, IsDesaturated
+-- --
+
+
+
+-- -- SIZE & POSITION:
+-- --   SetSize, GetSize, SetWidth, GetWidth, SetHeight, GetHeight
+-- --   SetScale, GetScale, GetScaledRect, SetPoint, GetPoint, ClearPoint
+-- --   ClearAllPoints, SetAllPoints, GetCenter, GetLeft, GetRight, GetTop, GetBottom
+-- --   SetPointsOffset, AdjustPointsOffset, ClearPointsOffset
+-- --
+-- -- COLOR & APPEARANCE:
+-- --   SetVertexColor, GetVertexColor, SetVertexColorFromBoolean
+-- --   SetBlendMode, GetBlendMode, SetAlpha, GetAlpha, SetAlphaFromBoolean
+-- --   SetGradient, SetDrawLayer, GetDrawLayer
+-- --
+-- -- ANIMATION:
+-- --   CreateAnimationGroup, GetAnimationGroups, StopAnimating
+-- --
+-- -- VISIBILITY & INTERACTION:
+-- --   Show, Hide, IsVisible, SetShown, IsRectValid
+-- --   IsMouseMotionFocus, IsMouseClickEnabled, SetMouseClickEnabled
+-- --   IsMouseOver, IsMouseEnabled, EnableMouse, IsMouseMotionEnabled, SetMouseMotionEnabled
+-- --   IsMouseWheelEnabled, EnableMouseWheel
+-- --
+-- -- RENDERING:
+-- --   SetSnapToPixelGrid, IsSnappingToPixelGrid, SetTexelSnappingBias, GetTexelSnappingBias
+-- --   SetHorizTile, GetHorizTile, GetRotation, SetRotation
+-- --   AddMaskTexture, RemoveMaskTexture, GetMaskTexture, GetNumMaskTextures
+-- --   SetIgnoreParentScale, IsIgnoringParentScale, SetIgnoreParentAlpha, IsIgnoringParentAlpha
+-- --
+-- -- PARENTING & HIERARCHY:
+-- --   SetParent, GetParent, SetParentKey, GetParentKey, ClearParentKey
+-- --   IsProtected, IsForbidden, SetForbidden, CanChangeProtectedState
+-- --
+-- -- MISC:
+-- --   GetObjectType, IsObjectType, GetDebugName, GetName
+-- --   HookScript, SetScript, HasScript, GetScript
+-- --   SetPropagateMouseClicks, CanPropagateMouseClicks, SetPropagateMouseMotion
+-- --   ShouldButtonPassThrough, SetPassThroughButtons
+-- --   IsPreventingSecretValues, SetPreventSecretValues, HasSecretValues
+-- --   CollapseLayout, SetCollapseLayout, IsCollapsed
+-- --   IsAnchoringRestricted, IsObjectLoaded, GetSourceLocation
+-- --   SetTexCoord, GetTexCoord, ResetTexCoord, SetSpriteSheetCell
+-- --   IsDragging, IsSnappingToGrid, SetBlockingLoadsRequested, IsBlockingLoadRequested
+-- --
+-- -- VERTEX OFFSETS:
+-- --   GetVertexOffset, SetVertexOffset, ClearVertexOffsets
+                        
+--                         -- Purple Square
+--                         fb:SetDesaturated(true)
+--                         fb:SetVertexColor(1.0, 0.0, 1.0)
+--                         fb:SetBlendMode("DISABLE")                         
+
+--                         -- Rotated
+--                         -- fb:SetDesaturated(true)
+--                         -- fb:SetVertexColor(1.0, 1.0, 0.0)
+--                         -- fb:SetRotation(math.rad(45))                        
+--                         -- fb:SetBlendMode("BLEND")
+                        
+
+--                     end)
+--                 end
+--             end
+--         end
+--     end
+    
+--     C_Timer.After(1, addon.customizeEssentialCooldownFlash)
+--     C_Timer.NewTicker(5, addon.customizeEssentialCooldownFlash)
+-- end
+
+-- Run debug after 5 seconds
+-- C_Timer.After(5, debugFlashStructure)
+
+-- We're detecting a Flipbook that exists before ability use, which is likely
+-- a TEMPLATE. EssentialCooldownViewer may be using this pattern:
+--   1. Create a base/template Flipbook with default settings
+--   2. Clone/copy it when abilities are used (JIT creation)
+--   3. The clones are what we see in fstack during the 8-second window
+
+-- NEXT STEPS TO INVESTIGATE:
+--   - Hook frame creation methods (CreateFrame, CreateTexture) on CooldownFlash parent
+--   - Watch for texture/frame cloning operations
+--   - Monitor SetTexture or SetAtlas calls to catch when GCD atlas switches to Proc atlas
+--   - Hook the template's animation creation to catch when animations are added
+--   - Look for CooldownFlash:Show() as trigger point to inspect what changed
+-- ===========================================================================
+
+-- do
+--     local seenFlipbooks = {}  -- Track which flipbooks we've logged
+    
+--     -- Recursive function to scan all children
+--     local function recursiveScan(frame, depth, path)
+--         if not frame then return end
+--         if depth > 10 then return end  -- Prevent infinite recursion
+        
+--         -- Check if this object has flipbook-like methods (SetAtlas, GetAnimationGroups)
+--         local hasFlipbookMethods = frame.SetAtlas and frame.GetAnimationGroups
+        
+--         if hasFlipbookMethods then
+--             local fbAddr = tostring(frame)
+            
+--             if not seenFlipbooks[fbAddr] then
+--                 seenFlipbooks[fbAddr] = true
+                
+--                 local objType = "unknown"
+--                 if frame.GetObjectType then
+--                     objType = frame:GetObjectType()
+--                 end
+                
+--                 local animGroups = {frame:GetAnimationGroups()}
+--                 local atlas = frame:GetAtlas() or "none"
+                
+--                 print("=== FLIPBOOK-LIKE OBJECT ===")
+--                 print("  Path:", path)
+--                 print("  Type:", objType)
+--                 print("  Address:", fbAddr)
+--                 print("  Atlas:", atlas)
+--                 print("  AnimationGroups:", #animGroups)
+                
+--                 -- INSPECT EACH ANIMATION GROUP IN DETAIL
+--                 for j, ag in ipairs(animGroups) do
+--                     local agAddr = tostring(ag)
+--                     print("  AnimGroup", j, ":", agAddr)
+                    
+--                     local anims = {ag:GetAnimations()}
+--                     print("    Animations:", #anims)
+                    
+--                     for k, anim in ipairs(anims) do
+--                         local animType = "unknown"
+--                         if anim.GetObjectType then
+--                             animType = anim:GetObjectType()
+--                         end
+--                         local animAddr = tostring(anim)
+--                         print("      Anim", k, "Type:", animType, "Addr:", animAddr)
+                        
+--                         if animType == "FlipBook" and anim.GetFlipBookRows then
+--                             print("        Rows:", anim:GetFlipBookRows())
+--                             print("        Cols:", anim:GetFlipBookColumns())
+--                             print("        Frames:", anim:GetFlipBookFrames())
+--                             print("        Duration:", anim:GetDuration())
+--                         end
+--                     end
+--                 end
+                
+--                 -- Modify atlas
+--                 frame:SetAtlas("UI-HUD-ActionBar-Proc-Start-Flipbook")
+                
+--                 -- Hook Play to modify animations
+--                 for _, ag in ipairs(animGroups) do
+--                     if not ag.SAdUI_PlayHooked then
+--                         ag.SAdUI_PlayHooked = true
+--                         hooksecurefunc(ag, "Play", function()
+--                             local anims = {ag:GetAnimations()}
+--                             for _, anim in ipairs(anims) do
+--                                 if anim.GetObjectType and anim:GetObjectType() == "FlipBook" then
+--                                     anim:SetFlipBookRows(6)
+--                                     anim:SetFlipBookColumns(5)
+--                                     anim:SetFlipBookFrames(30)
+--                                     anim:SetDuration(0.702)
+--                                     print(">>> FIXED ANIMATION ON PLAY:", path)
+--                                 end
+--                             end
+--                         end)
+--                     end
+--                 end
+--             end
+--         end
+        
+--         -- Recurse into children
+--         if frame.GetChildren then
+--             for i, child in pairs({frame:GetChildren()}) do
+--                 local childPath = path .. " > child" .. i
+--                 recursiveScan(child, depth + 1, childPath)
+--             end
+--         end
+        
+--         -- ALSO check regions (not just children!)
+--         if frame.GetRegions then
+--             for i, region in pairs({frame:GetRegions()}) do
+--                 local regionPath = path .. " > region" .. i
+--                 recursiveScan(region, depth + 1, regionPath)
+--             end
+--         end
+        
+--         -- Check common properties
+--         if frame.Flipbook then
+--             recursiveScan(frame.Flipbook, depth + 1, path .. " > Flipbook")
+--         end
+--         if frame.flipbook then
+--             recursiveScan(frame.flipbook, depth + 1, path .. " > flipbook")
+--         end
+--         if frame.CooldownFlash then
+--             recursiveScan(frame.CooldownFlash, depth + 1, path .. " > CooldownFlash")
+--         end
+--     end
+    
+--     function addon.customizeEssentialCooldownFlash()
+--         if not EssentialCooldownViewer then
+--             return
+--         end
+        
+--         -- Scan every 1 second - only new flipbooks will be logged
+--         C_Timer.NewTicker(1, function()
+--             recursiveScan(UIParent, 0, "UIParent")
+--         end)
+--     end
+    
+--     C_Timer.After(1, addon.customizeEssentialCooldownFlash)
+--     C_Timer.NewTicker(5, addon.customizeEssentialCooldownFlash)
+-- end
+
+-- ===========================================================================
+-- ANIMATION EXPLORATION GRID (TESTING TOOL)
+-- ===========================================================================
+
+-- do
+--     function addon.exploreAnimations()
+--         if addon.SAdUI_AnimationGrid then
+--             return -- Already created
+--         end
+        
+--         -- Create test frame
+--         local testFrame = CreateFrame("Frame", nil, UIParent)
+--         testFrame:SetSize(64, 64)
+--         testFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+--         addon.SAdUI_AnimationGrid = testFrame
+        
+--         -- Black background
+--         local bg = testFrame:CreateTexture(nil, "BACKGROUND")
+--         bg:SetAllPoints()
+--         bg:SetColorTexture(0, 0, 0, 1)
+        
+--         -- Label
+--         local label = testFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+--         label:SetPoint("TOP", testFrame, "BOTTOM", 0, -2)
+--         label:SetText("Modern Blizzard Proc (ABE code)")
+        
+--         -- Create the texture (matching ABE's ProcStartFlipbook)
+--         local texture = testFrame:CreateTexture(nil, "OVERLAY")
+--         texture:SetAtlas("UI-HUD-ActionBar-Proc-Start-Flipbook")
+--         texture:ClearAllPoints()
+--         texture:SetSize(64, 64) -- Match button size
+--         texture:SetPoint("CENTER", testFrame, "CENTER", 0, 0)
+--         texture:SetVertexColor(1.0, 1.0, 1.0) -- No color change
+--         texture:SetBlendMode("ADD")
+        
+--         -- Create AnimationGroup with FlipBook (matching ABE's startProc animation)
+--         local animGroup = texture:CreateAnimationGroup()
+--         local flipBook = animGroup:CreateAnimation("FlipBook")
+--         flipBook:SetFlipBookRows(6)         -- procAnim.rows or 6
+--         flipBook:SetFlipBookColumns(5)      -- procAnim.columns or 5
+--         flipBook:SetFlipBookFrames(30)      -- procAnim.frames or 30
+--         flipBook:SetDuration(0.702)         -- procAnim.duration or 0.702
+--         flipBook:SetFlipBookFrameWidth(0.0) -- procAnim.frameW or 0.0
+--         flipBook:SetFlipBookFrameHeight(0.0)-- procAnim.frameH or 0.0
+        
+--         -- Play animation once to test
+--         texture:Show()
+--         animGroup:Play()
+        
+--         -- Auto-replay every 3 seconds for testing
+--         C_Timer.NewTicker(3, function()
+--             animGroup:Play()
+--         end)
+--     end
+-- end
+

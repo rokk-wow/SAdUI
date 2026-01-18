@@ -1,6 +1,6 @@
 ## Interface: 120000, 120001
 ## Title: SAdUI
-## Author: Your Name
+## Author: Rôkk-Wyrmrest Accord
 ## Version: 1.0
 ## SavedVariables: SAdUI_Settings_Global
 ## SavedVariablesPerCharacter: SAdUI_Settings_Char
