@@ -453,6 +453,39 @@ do
 end
 
 -- ===========================================================================
+-- Hide Compact Raid Frame Manager
+-- ===========================================================================
+
+do
+    function addon.updateUI.CompactRaidFrameManagerVisibility()
+        if CompactRaidFrameManager then
+            CompactRaidFrameManager:Hide()
+            CompactRaidFrameManager:SetAlpha(0)
+            
+            hooksecurefunc(CompactRaidFrameManager, "Show", function(self)
+                self:Hide()
+                self:SetAlpha(0)
+            end)
+        end
+        
+        if CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleTank then
+            CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleTank:Hide()
+            CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleTank:SetAlpha(0)
+        end
+        
+        if CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleHealer then
+            CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleHealer:Hide()
+            CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleHealer:SetAlpha(0)
+        end
+        
+        if CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleDamager then
+            CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleDamager:Hide()
+            CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleDamager:SetAlpha(0)
+        end
+    end
+end
+
+-- ===========================================================================
 -- ESSENTIAL COOLDOWN VIEWER: COOLDOWN OVERLAY COLOR
 -- ===========================================================================
 
