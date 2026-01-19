@@ -7,11 +7,11 @@ addon.savedVarsPerCharName = "MyAddon_Settings_Char"
 addon.compartmentFuncName = "MyAddon_Compartment_Func"
 
 function addon:Initialize()
-    self.config.version = "1.0"
+    self.sadCore.version = "1.0"
     self.author = "Rôkk-Wyrmrest Accord"
 
     -- Example - Add Settings to Main Settings Panel
-    self.config.settings.main = {
+    self.sadCore.panels.main = {
         title = "exampleTitle",
         controls = {
             {
@@ -28,7 +28,7 @@ function addon:Initialize()
     }
 
     -- Example - Add a New Child Settings Panel
-    self.config.settings.examplePanel = {
+    self.sadCore.panels.examplePanel = {
         title = "examplePanelTitle",
         controls = {
             {
@@ -43,6 +43,22 @@ function addon:Initialize()
             },
         }
     }
+    
+    -- Example - Register event to demonstrate accessing savedVars
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", self.OnPlayerEnteringWorld)
+end
+
+function addon:OnPlayerEnteringWorld()
+    -- Example: Access UI control values from savedVars
+    local mainCheckbox = self.savedVars.main.exampleCheckbox
+    local panelCheckbox = self.savedVars.examplePanel.examplePanelCheckbox
+    
+    print(string.format("%s: Main checkbox is %s", addonName, tostring(mainCheckbox)))
+    print(string.format("%s: Panel checkbox is %s", addonName, tostring(panelCheckbox)))
+    
+    -- Example: Access custom data from savedVars.data
+    self.savedVars.data.loginCount = (self.savedVars.data.loginCount or 0) + 1
+    print(string.format("%s: You have logged in %d times", addonName, self.savedVars.data.loginCount))
 end
 
 function addon:exampleCheckbox(isChecked)

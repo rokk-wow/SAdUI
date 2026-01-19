@@ -69,11 +69,11 @@ SAddons are:
    addon.compartmentFuncName = "MyAddon_Compartment_Func"
    
    function addon:Initialize()
-       self.config.version = "1.0"
+       self.sadCore.version = "1.0"
        self.author = "Your Name"
        
        -- Example - Add Settings to Main Settings Panel
-       self.config.settings.main = {
+       self.sadCore.panels.main = {
            title = "exampleTitle",
            controls = {
                {
@@ -90,7 +90,7 @@ SAddons are:
        }
        
        -- Example - Add a New Child Settings Panel
-       self.config.settings.examplePanel = {
+       self.sadCore.panels.examplePanel = {
            title = "examplePanelTitle",
            controls = {
                {
@@ -138,11 +138,11 @@ This example shows all available control types using the same naming convention 
 
 ```lua
 function addon:Initialize()
-    self.config.version = "1.0"
+    self.sadCore.version = "1.0"
     self.author = "Your Name"
     
     -- Main Settings Panel
-    self.config.settings.main = {
+    self.sadCore.panels.main = {
         controls = {
             -- Header
             {
@@ -220,7 +220,7 @@ function addon:Initialize()
     }
     
     -- Child Settings Panel
-    self.config.settings.advancedPanel = {
+    self.sadCore.panels.advancedPanel = {
         title = "advancedTitle",
         controls = {
             {
@@ -320,18 +320,42 @@ To add a tooltip, define a localization key with the control's name + `"Tooltip"
 
 ## Accessing Saved Settings
 
-Control values are automatically persisted and can be accessed through `self.settings` organized by panel key. Access control values using `self.settings.panelKey.controlName`. Note that controls marked with `sessionOnly = true` will not be available in `self.settings` as they are not persisted.
+Control values are automatically persisted and can be accessed through `self.savedVars` organized by panel key. Access control values using `self.savedVars.panelKey.controlName`. Note that controls marked with `sessionOnly = true` will not be available in `self.savedVars` as they are not persisted.
 
 **Example:**
 ```lua
 function addon:PrintDebuggingStatus()
-    if self.settings.main.enableDebugging then
+    if self.savedVars.main.enableDebugging then
         self:Info("Debugging is currently ENABLED")
     else
         self:Info("Debugging is currently DISABLED")
     end
 end
 ```
+
+## Storing Custom Data
+
+Need to save data without creating UI controls? Use the reserved `self.savedVars.data` namespace. This table is automatically initialized and included in saved variables, export/import, and profile switching.
+
+**Example:**
+```lua
+-- Store arbitrary data
+self.savedVars.data.lastLoginTime = time()
+self.savedVars.data.playerStats = {
+    kills = 0,
+    deaths = 0,
+    honor = 0
+}
+
+-- Retrieve data later
+function addon:OnZoneChange(zone)
+    local stats = self.savedVars.data.playerStats or {}
+    stats.zonesVisited = stats.zonesVisited or {}
+    stats.zonesVisited[zone] = true
+end
+```
+
+**Note:** The `data` namespace is reserved for your use. Don't create panel keys named "data" to avoid conflicts.
 
 ## Adding New Lua Files
 
@@ -371,7 +395,7 @@ You can register additional commands as **parameters** to the main slash command
 **Example:**
 ```lua
 function addon:Initialize()
-    self.config.version = "1.0"
+    self.sadCore.version = "1.0"
     self.author = "Your Name"
     
     -- Configure your settings panels here
@@ -388,7 +412,7 @@ end
 
 function addon:DebugCommand(enabled)
     if enabled == "on" then
-        self.settings.main.enableDebugging = true
+        self.savedVars.main.enableDebugging = true
         self:Info("Debugging enabled")
     end
 end
@@ -407,7 +431,7 @@ Register WoW events with `self:RegisterEvent(eventName, callback)`:
 
 ```lua
 function addon:Initialize()
-    self.config.version = "1.0"
+    self.sadCore.version = "1.0"
     self.author = "Your Name"
     
     -- Configure your settings panels here

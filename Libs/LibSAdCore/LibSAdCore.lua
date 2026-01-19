@@ -217,7 +217,7 @@ end
 --[[============================================================================
     SAdCore - Simple Addon Core
 ==============================================================================]]
-local SADCORE_MAJOR, SADCORE_MINOR = "SAdCore-1", 6
+local SADCORE_MAJOR, SADCORE_MINOR = "SAdCore-1", 8
 local SAdCore, oldminor = LibStub:NewLibrary(SADCORE_MAJOR, SADCORE_MINOR)
 if not SAdCore then
     return
@@ -301,9 +301,8 @@ do -- Initialize
     function addon:_Initialize(savedVarsGlobal, savedVarsPerChar)
         callHook(self, "BeforeInitialize", savedVarsGlobal, savedVarsPerChar)
 
-        self.config = self.config or {}
-        self.config.settings = self.config.settings or {}
         self.sadCore = self.sadCore or {}
+        self.sadCore.panels = self.sadCore.panels or {}
         self.sadCore.version = SADCORE_MAJOR:match("%d+") .. "." .. SADCORE_MINOR
         self.apiVersion = select(4, GetBuildInfo())
 
@@ -326,7 +325,7 @@ do -- Initialize
 
         self.localization = self.locale[clientLocale] or self.locale.enEN
 
-        self.config.ui = self.config.ui or {
+        self.sadCore.ui = self.sadCore.ui or {
             spacing = {
                 panelTop = -25,
                 panelBottom = 20,
@@ -415,29 +414,29 @@ do -- Initialize
             savedVarsPerChar)
 
         if savedVarsGlobal then
-            self.settingsGlobal = savedVarsGlobal
-            self.settingsGlobal.main = self.settingsGlobal.main or {}
+            self.savedVarsGlobal = savedVarsGlobal
+            self.savedVarsGlobal.main = self.savedVarsGlobal.main or {}
         else
-            self.settingsGlobal = {}
-            self.settingsGlobal.main = {}
+            self.savedVarsGlobal = {}
+            self.savedVarsGlobal.main = {}
         end
 
         if savedVarsPerChar then
-            self.settingsChar = savedVarsPerChar
-            self.settingsChar.main = self.settingsChar.main or {}
+            self.savedVarsChar = savedVarsPerChar
+            self.savedVarsChar.main = self.savedVarsChar.main or {}
         else
-            self.settingsChar = {}
-            self.settingsChar.main = {}
+            self.savedVarsChar = {}
+            self.savedVarsChar.main = {}
         end
 
         if self.savedVarsGlobalName then
-            _G[self.savedVarsGlobalName] = self.settingsGlobal
+            _G[self.savedVarsGlobalName] = self.savedVarsGlobal
         end
         if self.savedVarsPerCharName then
-            _G[self.savedVarsPerCharName] = self.settingsChar
+            _G[self.savedVarsPerCharName] = self.savedVarsChar
         end
 
-        self.settings = (self.settingsChar.useCharacterSettings) and self.settingsChar or self.settingsGlobal
+        self.savedVars = (self.savedVarsChar.useCharacterSettings) and self.savedVarsChar or self.savedVarsGlobal
 
         local returnValue = true
         callHook(self, "AfterInitializeSavedVariables", returnValue)
@@ -666,15 +665,15 @@ do -- Settings Panels
         }}
 
         local main = {}
-        main.title = (self.config.settings.main and self.config.settings.main.title) or self.addonName
+        main.title = (self.sadCore.panels.main and self.sadCore.panels.main.title) or self.addonName
         main.controls = {}
 
         for _, control in ipairs(headerControls) do
             table.insert(main.controls, control)
         end
 
-        if self.config.settings.main and self.config.settings.main.controls then
-            for _, control in ipairs(self.config.settings.main.controls) do
+        if self.sadCore.panels.main and self.sadCore.panels.main.controls then
+            for _, control in ipairs(self.sadCore.panels.main.controls) do
                 table.insert(main.controls, control)
             end
         end
@@ -683,7 +682,7 @@ do -- Settings Panels
             table.insert(main.controls, control)
         end
 
-        self.config.settings.main = main
+        self.sadCore.panels.main = main
 
         local returnValue = true
         callHook(self, "AfterConfigureMainSettings", returnValue)
@@ -693,21 +692,23 @@ do -- Settings Panels
     function addon:_InitializeDefaultSettings()
         callHook(self, "BeforeInitializeDefaultSettings")
 
-        if not self.config.settings then
+        if not self.sadCore.panels then
             callHook(self, "AfterInitializeDefaultSettings", false)
             return false
         end
 
-        for panelKey, panelConfig in pairs(self.config.settings) do
-            self.settings[panelKey] = self.settings[panelKey] or {}
+        self.savedVars.data = self.savedVars.data or {}
+
+        for panelKey, panelConfig in pairs(self.sadCore.panels) do
+            self.savedVars[panelKey] = self.savedVars[panelKey] or {}
             
             if panelConfig.controls then
                 for _, controlConfig in ipairs(panelConfig.controls) do
                     local controlName = controlConfig.name
                     local controlDefault = controlConfig.default
                     
-                    if controlName and controlDefault ~= nil and self.settings[panelKey][controlName] == nil then
-                        self.settings[panelKey][controlName] = controlDefault
+                    if controlName and controlDefault ~= nil and self.savedVars[panelKey][controlName] == nil then
+                        self.savedVars[panelKey][controlName] = controlDefault
                     end
                 end
             end
@@ -731,7 +732,7 @@ do -- Settings Panels
         self.settingsPanels["main"] = self.mainSettingsPanel
 
         local sortedPanelKeys = {}
-        for panelKey in pairs(self.config.settings) do
+        for panelKey in pairs(self.sadCore.panels) do
             if panelKey ~= "main" then
                 table.insert(sortedPanelKeys, panelKey)
             end
@@ -739,7 +740,7 @@ do -- Settings Panels
         table.sort(sortedPanelKeys)
 
         for _, panelKey in ipairs(sortedPanelKeys) do
-            local panelConfig = self.config.settings[panelKey]
+            local panelConfig = self.sadCore.panels[panelKey]
             local childPanel = self:_BuildChildSettingsPanel(panelKey)
             if childPanel then
                 local categoryName = self:L(panelConfig.title or panelKey)
@@ -767,7 +768,7 @@ do -- Settings Panels
         panel.controlRefreshers = {}
 
         local content = panel.ScrollFrame.Content
-        local yOffset = self.config.ui.spacing.panelTop
+        local yOffset = self.sadCore.ui.spacing.panelTop
 
         if config.controls then
             for _, controlConfig in ipairs(config.controls) do
@@ -779,7 +780,7 @@ do -- Settings Panels
             end
         end
 
-        content:SetHeight(math.abs(yOffset) + self.config.ui.spacing.panelBottom)
+        content:SetHeight(math.abs(yOffset) + self.sadCore.ui.spacing.panelBottom)
 
         callHook(self, "AfterBuildSettingsPanelHelper", panel)
         return panel
@@ -788,7 +789,7 @@ do -- Settings Panels
     function addon:_BuildMainSettingsPanel()
         callHook(self, "BeforeBuildMainSettingsPanel")
 
-        local panel = self:_BuildSettingsPanelHelper("main", self.config.settings.main)
+        local panel = self:_BuildSettingsPanelHelper("main", self.sadCore.panels.main)
 
         callHook(self, "AfterBuildMainSettingsPanel", panel)
         return panel
@@ -797,7 +798,7 @@ do -- Settings Panels
     function addon:_BuildChildSettingsPanel(panelKey)
         panelKey = callHook(self, "BeforeBuildChildSettingsPanel", panelKey)
 
-        local panel = self:_BuildSettingsPanelHelper(panelKey, self.config.settings[panelKey])
+        local panel = self:_BuildSettingsPanelHelper(panelKey, self.sadCore.panels[panelKey])
 
         callHook(self, "AfterBuildChildSettingsPanel", panel)
         return panel
@@ -848,8 +849,8 @@ do -- Controls
 
         local header = CreateFrame("Frame", nil, parent)
         header:SetHeight(50)
-        header:SetPoint("TOPLEFT", self.config.ui.spacing.contentLeft, yOffset)
-        header:SetPoint("TOPRIGHT", self.config.ui.spacing.contentRight, yOffset)
+        header:SetPoint("TOPLEFT", self.sadCore.ui.spacing.contentLeft, yOffset)
+        header:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.contentRight, yOffset)
 
         header.Title = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
         header.Title:SetPoint("BOTTOMLEFT", 7, 4)
@@ -857,7 +858,7 @@ do -- Controls
         header.Title:SetJustifyV("BOTTOM")
         header.Title:SetText(self:L(name))
 
-        local newYOffset = yOffset - self.config.ui.spacing.headerHeight
+        local newYOffset = yOffset - self.sadCore.ui.spacing.headerHeight
         callHook(self, "AfterAddHeader", header, newYOffset)
         return header, newYOffset
     end
@@ -882,31 +883,31 @@ do -- Controls
             end
         elseif name == "core_useCharacterSettings" then
             getValue = function()
-                return self.settingsChar.useCharacterSettings
+                return self.savedVarsChar.useCharacterSettings
             end
             setValue = function(value)
-                self.settingsChar.useCharacterSettings = value
+                self.savedVarsChar.useCharacterSettings = value
                 if onValueChange then
                     onValueChange(addonInstance, value)
                 end
             end
             if getValue() == nil then
-                self.settingsChar.useCharacterSettings = defaultValue
+                self.savedVarsChar.useCharacterSettings = defaultValue
             end
         else
-            self.settings[panelKey] = self.settings[panelKey] or {}
-            if self.settings[panelKey][name] == nil then
-                self.settings[panelKey][name] = defaultValue
+            self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+            if self.savedVars[panelKey][name] == nil then
+                self.savedVars[panelKey][name] = defaultValue
             end
 
             getValue = function()
-                self.settings[panelKey] = self.settings[panelKey] or {}
-                return self.settings[panelKey][name]
+                self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+                return self.savedVars[panelKey][name]
             end
 
             setValue = function(value)
-                self.settings[panelKey] = self.settings[panelKey] or {}
-                self.settings[panelKey][name] = value
+                self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+                self.savedVars[panelKey][name] = value
                 if onValueChange then
                     onValueChange(addonInstance, value)
                 end
@@ -915,8 +916,8 @@ do -- Controls
 
         local checkbox = CreateFrame("Frame", nil, parent)
         checkbox:SetHeight(32)
-        checkbox:SetPoint("TOPLEFT", self.config.ui.spacing.controlLeft, yOffset)
-        checkbox:SetPoint("TOPRIGHT", self.config.ui.spacing.controlRight, yOffset)
+        checkbox:SetPoint("TOPLEFT", self.sadCore.ui.spacing.controlLeft, yOffset)
+        checkbox:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.controlRight, yOffset)
 
         checkbox.Text = checkbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         checkbox.Text:SetSize(205, 0)
@@ -974,7 +975,7 @@ do -- Controls
             end)
         end
 
-        local newYOffset = yOffset - self.config.ui.spacing.controlHeight
+        local newYOffset = yOffset - self.sadCore.ui.spacing.controlHeight
         callHook(self, "AfterAddCheckbox", checkbox, newYOffset)
         return checkbox, newYOffset
     end
@@ -989,17 +990,17 @@ do -- Controls
         local currentValue = defaultValue
 
         if sessionOnly ~= true then
-            self.settings[panelKey] = self.settings[panelKey] or {}
-            if self.settings[panelKey][name] == nil then
-                self.settings[panelKey][name] = defaultValue
+            self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+            if self.savedVars[panelKey][name] == nil then
+                self.savedVars[panelKey][name] = defaultValue
             end
-            currentValue = self.settings[panelKey][name]
+            currentValue = self.savedVars[panelKey][name]
         end
 
         local dropdown = CreateFrame("Frame", nil, parent)
         dropdown:SetHeight(32)
-        dropdown:SetPoint("TOPLEFT", self.config.ui.spacing.controlLeft, yOffset)
-        dropdown:SetPoint("TOPRIGHT", self.config.ui.spacing.controlRight, yOffset)
+        dropdown:SetPoint("TOPLEFT", self.sadCore.ui.spacing.controlLeft, yOffset)
+        dropdown:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.controlRight, yOffset)
 
         dropdown.Text = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         dropdown.Text:SetSize(205, 0)
@@ -1010,17 +1011,17 @@ do -- Controls
 
         dropdown.Dropdown = CreateFrame("Frame", nil, dropdown, "UIDropDownMenuTemplate")
         dropdown.Dropdown:SetPoint("LEFT", 200, 3)
-        UIDropDownMenu_SetWidth(dropdown.Dropdown, self.config.ui.dropdown.width)
+        UIDropDownMenu_SetWidth(dropdown.Dropdown, self.sadCore.ui.dropdown.width)
 
         local initializeFunc = function(dropdownFrame, level)
-            local savedValue = (sessionOnly ~= true) and addonInstance.settings[panelKey][name] or currentValue
+            local savedValue = (sessionOnly ~= true) and addonInstance.savedVars[panelKey][name] or currentValue
             for _, option in ipairs(options) do
                 local info = UIDropDownMenu_CreateInfo()
                 info.text = addonInstance:L(option.label)
                 info.value = option.value
                 info.func = function(self)
                     if sessionOnly ~= true then
-                        addonInstance.settings[panelKey][name] = self.value
+                        addonInstance.savedVars[panelKey][name] = self.value
                     else
                         currentValue = self.value
                     end
@@ -1044,8 +1045,8 @@ do -- Controls
 
         if not skipRefresh and sessionOnly ~= true then
             dropdown.refresh = function()
-                addonInstance.settings[panelKey] = addonInstance.settings[panelKey] or {}
-                local value = addonInstance.settings[panelKey][name]
+                addonInstance.savedVars[panelKey] = addonInstance.savedVars[panelKey] or {}
+                local value = addonInstance.savedVars[panelKey][name]
                 if value == nil then
                     value = defaultValue
                 end
@@ -1053,7 +1054,7 @@ do -- Controls
             end
         end
 
-        local newYOffset = yOffset - self.config.ui.spacing.controlHeight
+        local newYOffset = yOffset - self.sadCore.ui.spacing.controlHeight
         callHook(self, "AfterAddDropdown", dropdown, newYOffset)
         return dropdown, newYOffset
     end
@@ -1068,17 +1069,17 @@ do -- Controls
         local currentValue = defaultValue
 
         if sessionOnly ~= true then
-            self.settings[panelKey] = self.settings[panelKey] or {}
-            if self.settings[panelKey][name] == nil then
-                self.settings[panelKey][name] = defaultValue
+            self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+            if self.savedVars[panelKey][name] == nil then
+                self.savedVars[panelKey][name] = defaultValue
             end
-            currentValue = self.settings[panelKey][name]
+            currentValue = self.savedVars[panelKey][name]
         end
 
         local slider = CreateFrame("Frame", nil, parent)
         slider:SetHeight(32)
-        slider:SetPoint("TOPLEFT", self.config.ui.spacing.controlLeft, yOffset)
-        slider:SetPoint("TOPRIGHT", self.config.ui.spacing.controlRight, yOffset)
+        slider:SetPoint("TOPLEFT", self.sadCore.ui.spacing.controlLeft, yOffset)
+        slider:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.controlRight, yOffset)
 
         slider.Text = slider:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         slider.Text:SetSize(205, 0)
@@ -1097,7 +1098,7 @@ do -- Controls
 
         local steps = (maxValue - minValue) / step
         slider.Slider:Init(currentValue or defaultValue, minValue, maxValue, steps)
-        slider.Slider:SetWidth(self.config.ui.slider.width)
+        slider.Slider:SetWidth(self.sadCore.ui.slider.width)
 
         local function updateValue(value)
             if value == 0 then
@@ -1113,7 +1114,7 @@ do -- Controls
 
         slider.Slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
             if sessionOnly ~= true then
-                addonInstance.settings[panelKey][name] = value
+                addonInstance.savedVars[panelKey][name] = value
             else
                 currentValue = value
             end
@@ -1125,8 +1126,8 @@ do -- Controls
 
         if not skipRefresh and sessionOnly ~= true then
             slider.refresh = function()
-                addonInstance.settings[panelKey] = addonInstance.settings[panelKey] or {}
-                local value = addonInstance.settings[panelKey][name]
+                addonInstance.savedVars[panelKey] = addonInstance.savedVars[panelKey] or {}
+                local value = addonInstance.savedVars[panelKey][name]
                 if value == nil then
                     value = defaultValue
                 end
@@ -1149,7 +1150,7 @@ do -- Controls
             end)
         end
 
-        local newYOffset = yOffset - self.config.ui.spacing.controlHeight
+        local newYOffset = yOffset - self.sadCore.ui.spacing.controlHeight
         callHook(self, "AfterAddSlider", slider, newYOffset)
         return slider, newYOffset
     end
@@ -1161,8 +1162,8 @@ do -- Controls
 
         local button = CreateFrame("Frame", nil, parent)
         button:SetHeight(40)
-        button:SetPoint("TOPLEFT", self.config.ui.spacing.contentLeft, yOffset)
-        button:SetPoint("TOPRIGHT", self.config.ui.spacing.contentRight, yOffset)
+        button:SetPoint("TOPLEFT", self.sadCore.ui.spacing.contentLeft, yOffset)
+        button:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.contentRight, yOffset)
 
         button.Button = CreateFrame("Button", nil, button, "UIPanelButtonTemplate")
         button.Button:SetSize(120, 22)
@@ -1189,7 +1190,7 @@ do -- Controls
             end)
         end
 
-        local newYOffset = yOffset - self.config.ui.spacing.buttonHeight
+        local newYOffset = yOffset - self.sadCore.ui.spacing.buttonHeight
         callHook(self, "AfterAddButton", button, newYOffset)
         return button, newYOffset
     end
@@ -1203,17 +1204,17 @@ do -- Controls
         local currentValue = defaultValue
 
         if sessionOnly ~= true then
-            self.settings[panelKey] = self.settings[panelKey] or {}
-            if self.settings[panelKey][name] == nil then
-                self.settings[panelKey][name] = defaultValue
+            self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+            if self.savedVars[panelKey][name] == nil then
+                self.savedVars[panelKey][name] = defaultValue
             end
-            currentValue = self.settings[panelKey][name]
+            currentValue = self.savedVars[panelKey][name]
         end
 
         local colorPicker = CreateFrame("Frame", nil, parent)
         colorPicker:SetHeight(32)
-        colorPicker:SetPoint("TOPLEFT", self.config.ui.spacing.controlLeft, yOffset)
-        colorPicker:SetPoint("TOPRIGHT", self.config.ui.spacing.controlRight, yOffset)
+        colorPicker:SetPoint("TOPLEFT", self.sadCore.ui.spacing.controlLeft, yOffset)
+        colorPicker:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.controlRight, yOffset)
 
         colorPicker.Text = colorPicker:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         colorPicker.Text:SetSize(205, 0)
@@ -1246,7 +1247,7 @@ do -- Controls
             local r, g, b, a = self:HexToRGB(hexColor)
             colorPicker.ColorSwatch.Color:SetColorTexture(r, g, b, a)
             if sessionOnly ~= true then
-                self.settings[panelKey][name] = hexColor
+                self.savedVars[panelKey][name] = hexColor
             else
                 currentValue = hexColor
             end
@@ -1260,7 +1261,7 @@ do -- Controls
         end
 
         colorPicker.ColorSwatch:SetScript("OnClick", function(self)
-            local r, g, b, a = addonInstance:HexToRGB((sessionOnly ~= true) and addonInstance.settings[panelKey][name] or
+            local r, g, b, a = addonInstance:HexToRGB((sessionOnly ~= true) and addonInstance.savedVars[panelKey][name] or
                                                           currentValue or defaultValue)
 
             ColorPickerFrame:SetupColorPickerAndShow({
@@ -1289,8 +1290,8 @@ do -- Controls
 
         if not skipRefresh and sessionOnly ~= true then
             colorPicker.refresh = function()
-                self.settings[panelKey] = self.settings[panelKey] or {}
-                local value = self.settings[panelKey][name]
+                self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+                local value = self.savedVars[panelKey][name]
                 if value == nil then
                     value = defaultValue
                 end
@@ -1315,7 +1316,7 @@ do -- Controls
             end)
         end
 
-        local newYOffset = yOffset - self.config.ui.spacing.controlHeight
+        local newYOffset = yOffset - self.sadCore.ui.spacing.controlHeight
         callHook(self, "AfterAddColorPicker", colorPicker, newYOffset)
         return colorPicker, newYOffset
     end
@@ -1326,13 +1327,13 @@ do -- Controls
             name, onClick)
 
         local frame = CreateFrame("Frame", nil, parent)
-        frame:SetPoint("TOPLEFT", self.config.ui.spacing.controlLeft, yOffset)
-        frame:SetPoint("TOPRIGHT", self.config.ui.spacing.controlRight, yOffset)
+        frame:SetPoint("TOPLEFT", self.sadCore.ui.spacing.controlLeft, yOffset)
+        frame:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.controlRight, yOffset)
         frame:SetHeight(32)
 
         local fontString = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        fontString:SetPoint("LEFT", self.config.ui.spacing.textInset, 0)
-        fontString:SetPoint("RIGHT", -self.config.ui.spacing.textInset, 0)
+        fontString:SetPoint("LEFT", self.sadCore.ui.spacing.textInset, 0)
+        fontString:SetPoint("RIGHT", -self.sadCore.ui.spacing.textInset, 0)
         fontString:SetJustifyH("LEFT")
         fontString:SetJustifyV("TOP")
         fontString:SetWordWrap(true)
@@ -1355,7 +1356,7 @@ do -- Controls
             end)
         end
 
-        local newYOffset = yOffset - math.max(32, stringHeight) - self.config.ui.spacing.descriptionPadding
+        local newYOffset = yOffset - math.max(32, stringHeight) - self.sadCore.ui.spacing.descriptionPadding
         callHook(self, "AfterAddDescription", frame, newYOffset)
         return frame, newYOffset
     end
@@ -1369,8 +1370,8 @@ do -- Controls
 
         local frame = CreateFrame("Frame", nil, parent)
         frame:SetHeight(totalHeight)
-        frame:SetPoint("TOPLEFT", self.config.ui.spacing.controlLeft, yOffset)
-        frame:SetPoint("TOPRIGHT", self.config.ui.spacing.controlRight, yOffset)
+        frame:SetPoint("TOPLEFT", self.sadCore.ui.spacing.controlLeft, yOffset)
+        frame:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.controlRight, yOffset)
 
         frame.Line = frame:CreateTexture(nil, "ARTWORK")
         frame.Line:SetHeight(1)
@@ -1392,8 +1393,8 @@ do -- Controls
 
         local control = CreateFrame("Frame", nil, parent)
         control:SetHeight(32)
-        control:SetPoint("TOPLEFT", self.config.ui.spacing.controlLeft, yOffset)
-        control:SetPoint("TOPRIGHT", self.config.ui.spacing.controlRight, yOffset)
+        control:SetPoint("TOPLEFT", self.sadCore.ui.spacing.controlLeft, yOffset)
+        control:SetPoint("TOPRIGHT", self.sadCore.ui.spacing.controlRight, yOffset)
 
         control.Text = control:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         control.Text:SetSize(205, 0)
@@ -1419,15 +1420,15 @@ do -- Controls
         local shouldPersist = sessionOnly ~= true
 
         if shouldPersist then
-            self.settings[panelKey] = self.settings[panelKey] or {}
-            if self.settings[panelKey][name] == nil then
-                self.settings[panelKey][name] = default
+            self.savedVars[panelKey] = self.savedVars[panelKey] or {}
+            if self.savedVars[panelKey][name] == nil then
+                self.savedVars[panelKey][name] = default
             end
 
             control.EditBox:SetScript("OnTextChanged", function(self, userInput)
                 if userInput then
                     local newValue = self:GetText()
-                    addonInstance.settings[panelKey][name] = newValue
+                    addonInstance.savedVars[panelKey][name] = newValue
                     if onValueChange then
                         onValueChange(addonInstance, newValue)
                     end
@@ -1487,7 +1488,7 @@ do -- Controls
 
         control.EditBox:SetScript("OnShow", function(self)
             if shouldPersist then
-                local savedValue = addonInstance.settings[panelKey][name]
+                local savedValue = addonInstance.savedVars[panelKey][name]
                 if savedValue and self:GetText() == "" then
                     self:SetText(savedValue)
                     self:SetCursorPosition(0)
@@ -1499,7 +1500,7 @@ do -- Controls
         end)
 
         if shouldPersist then
-            local initialValue = self.settings[panelKey][name] or default
+            local initialValue = self.savedVars[panelKey][name] or default
             if initialValue then
                 control.EditBox:SetText(initialValue)
                 control.EditBox:SetCursorPosition(0)
@@ -1510,7 +1511,7 @@ do -- Controls
             end
 
             control.refresh = function()
-                local value = addonInstance.settings[panelKey][name] or default
+                local value = addonInstance.savedVars[panelKey][name] or default
                 if value then
                     control.EditBox:SetText(value)
                     control.EditBox:SetCursorPosition(0)
@@ -1523,7 +1524,7 @@ do -- Controls
             end
         end
 
-        local newYOffset = yOffset - self.config.ui.spacing.controlHeight
+        local newYOffset = yOffset - self.sadCore.ui.spacing.controlHeight
         callHook(self, "AfterAddInputBox", control, newYOffset)
         return control, newYOffset
     end
@@ -1535,7 +1536,7 @@ do -- Controls
         self:Debug("ShowDialog called")
         local dialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
 
-        local uiCfg = self.config.ui
+        local uiCfg = self.sadCore.ui
         local width = dialogOptions.width or uiCfg.dialog.defaultWidth
         dialog:SetWidth(width)
         dialog:SetPoint("CENTER")
@@ -1755,7 +1756,7 @@ do -- Utility Functions
     end
 
     function addon:_coreDebug(text)
-        if self.settings and self.settings.main and self.settings.main.core_enableDebugging then
+        if self.savedVars and self.savedVars.main and self.savedVars.main.core_enableDebugging then
             print("\124cffDB09FE" .. "SAdCore" .. " Debug: " .. "\124cffBAFF1A" .. tostring(text))
         end
     end
@@ -1782,8 +1783,8 @@ do -- Utility Functions
 
     function addon:Debug(text)
         text = callHook(self, "BeforeDebug", text)
-       
-        if self.settings and self.settings.main and self.settings.main.core_enableDebugging then
+
+        if self.savedVars and self.savedVars.main and self.savedVars.main.core_enableDebugging then
             print("\124cffDB09FE" .. self.addonName .. " Debug: " .. "\124cffBAFF1A" .. tostring(text))
         end
 
@@ -1824,10 +1825,10 @@ do -- Utility Functions
         useCharacter = callHook(self, "BeforeUpdateActiveSettings", useCharacter)
         self:Debug("UpdateActiveSettings called with: " .. tostring(useCharacter) .. " (type: " .. type(useCharacter) ..
                        ")")
-        self:Debug("settingsChar exists: " .. tostring(self.settingsChar ~= nil) .. ", settingsGlobal exists: " ..
-                       tostring(self.settingsGlobal ~= nil))
+        self:Debug("savedVarsChar exists: " .. tostring(self.savedVarsChar ~= nil) .. ", savedVarsGlobal exists: " ..
+                       tostring(self.savedVarsGlobal ~= nil))
 
-        self.settings = useCharacter and self.settingsChar or self.settingsGlobal
+        self.savedVars = useCharacter and self.savedVarsChar or self.savedVarsGlobal
 
         local profileType = useCharacter and "Character" or "Global"
         self:Debug("Profile switched to: " .. profileType)
@@ -1843,8 +1844,8 @@ do -- Utility Functions
 
         local exportData = {
             addon = self.addonName,
-            version = tostring(self.config.version),
-            settings = self.settings
+            version = tostring(self.sadCore.version),
+            settings = self.savedVars
         }
 
         local LibSerialize = self.LibSerialize
@@ -1931,7 +1932,7 @@ do -- Utility Functions
         self:Debug("Data keys: " .. table.concat(keys, ", "))
 
         self:Debug("Import: - addon: " .. tostring(data.addon) .. ", version: " .. tostring(data.version))
-        self:Debug("Loaded: - addon: " .. tostring(self.addonName) .. ", version: " ..tostring(self.config.version))
+        self:Debug("Loaded: - addon: " .. tostring(self.addonName) .. ", version: " ..tostring(self.sadCore.version))
 
         if data.addon ~= self.addonName then
             self:Error(self:L("core_importWrongAddon") .. ": " .. tostring(data.addon) .. " (expected: " ..
@@ -1943,9 +1944,9 @@ do -- Utility Functions
 
         self:Debug("Addon name check passed")
 
-        if tostring(data.version) ~= tostring(self.config.version) then
+        if tostring(data.version) ~= tostring(self.sadCore.version) then
             self:Info(self:L("core_importAddonVersionMismatch") .. " " .. self:L("core_installed") .. ": " ..
-                          tostring(self.config.version) .. ", " .. self:L("core_importString") .. ": " ..
+                          tostring(self.sadCore.version) .. ", " .. self:L("core_importString") .. ": " ..
                           tostring(data.version) .. ". " .. self:L("core_dataMismatchWarning"))
         end
 
@@ -1959,12 +1960,12 @@ do -- Utility Functions
         local importedSettings = data.settings
 
         self:Debug("Clearing current settings and importing...")
-        for key in pairs(self.settings) do
-            self.settings[key] = nil
+        for key in pairs(self.savedVars) do
+            self.savedVars[key] = nil
         end
 
         for key, value in pairs(importedSettings) do
-            self.settings[key] = value
+            self.savedVars[key] = value
         end
 
         self:info(self:L("core_importSuccess"))

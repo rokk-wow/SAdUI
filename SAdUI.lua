@@ -14,7 +14,7 @@ addon.savedVarsPerCharName = "SAdUI_Settings_Char"
 addon.compartmentFuncName = "SAdUI_Compartment_Func"
 
 function addon:Initialize()
-    self.config.version = "1.0"
+    self.sadCore.version = "1.0"
     self.author = "Rôkk-Wyrmrest Accord"
     
     -- Event registration must be at the end of Initialize
