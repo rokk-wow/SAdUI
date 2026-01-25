@@ -16,9 +16,89 @@ addon.sadCore.compartmentFuncName = "SAdUI_Compartment_Func"
 function addon:Initialize()
     self.sadCore.version = "1.0"
     self.author = "Rôkk-Wyrmrest Accord"
+
+    -- Add Settings Panel using new AddSettingsPanel method (v1.13+)
+    self:AddSettingsPanel("markerStyle", {
+        title = "options",
+        controls = {
+            {
+                type = "dropdown",
+                name = "font",
+                label = "Font",
+                default = "Interface/AddOns/SAdUI/Media/Fonts/FiraMonoMedium.ttf",
+                options = {
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/Quicksand.ttf", label = "Quicksand"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/PTSansNarrow.ttf", label = "PT Sans Narrow"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/Oswald.ttf", label = "Oswald"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/LiberationSans.ttf", label = "Liberation Sans"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/Impact.ttf", label = "Impact"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/Hack.ttf", label = "Hack"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/GothamUltra.ttf", label = "Gotham Ultra"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/FuturaPTBold.ttf", label = "Futura PT Bold"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/FORCEDSQUARE.ttf", label = "Forced Square"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/DorisPP.ttf", label = "Doris PP"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/DejaVuLGCSerif.ttf", label = "DejaVu LGC Serif"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/ContinuumMedium.ttf", label = "Continuum Medium"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/Collegiate.ttf", label = "Collegiate"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/BorisBlackBloxxDirty.ttf", label = "Boris Black Bloxx Dirty"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/BlenderProHeavy.ttf", label = "Blender Pro Heavy"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/AvantGardeLTBold.ttf", label = "Avant Garde LT Bold"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/AvantGardeLTMedium.ttf", label = "Avant Garde LT Medium"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/AccidentalPresidency.ttf", label = "Accidental Presidency"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/FritzQuadrata.ttf", label = "Fritz Quadrata"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/FiraMonoMedium.ttf", label = "Fira Mono Medium"},
+                    {value = "Interface/AddOns/SAdUI/Media/Fonts/Micro.ttf", label = "Micro"}
+                },
+                onValueChange = self.fontChanged
+            },
+            {
+                type = "checkbox",
+                name = "hideActionBar8",
+                label = "Hide Action Bar 8",
+                default = true,
+                onValueChange = self.actionBar8Changed
+            }
+        }
+    })
     
     -- Event registration must be at the end of Initialize
     addon:RegisterEvent("PLAYER_ENTERING_WORLD", addon.OnPlayerEnteringWorld)
+end
+
+-- InfoBox configuration constants
+local INFOBOX_FONT_SIZE = 12
+local INFOBOX_LINE_HEIGHT = 18
+local DIVIDER_HEIGHT = 10
+
+function addon:fontChanged(fontPath)
+    if not addon.SAdUI_InfoBox then
+        return
+    end
+    
+    local fontStrings = {
+        addon.SAdUI_InfoBox.ilvl,
+        addon.SAdUI_InfoBox.gold,
+        addon.SAdUI_InfoBox.conquest,
+        addon.SAdUI_InfoBox.honor,
+        addon.SAdUI_InfoBox.speed,
+        addon.SAdUI_InfoBox.durability,
+        addon.SAdUI_InfoBox.vers,
+        addon.SAdUI_InfoBox.haste,
+        addon.SAdUI_InfoBox.mastery,
+        addon.SAdUI_InfoBox.fps,
+        addon.SAdUI_InfoBox.ping
+    }
+    
+    for i, fontString in ipairs(fontStrings) do
+        if fontString then
+            local currentText = fontString:GetText()
+            fontString:SetFont(fontPath, INFOBOX_FONT_SIZE, "OUTLINE")
+            if currentText then
+                fontString:SetText("")
+                fontString:SetText(currentText)
+            end
+        end
+    end
 end
 
 function addon.OnPlayerEnteringWorld()
@@ -99,8 +179,16 @@ end
 do
     function addon.updateUI.SetActionBar8Opacity()
         if MultiBar7 then
-            MultiBar7:SetAlpha(0)
+            local shouldHide = addon.savedVars.markerStyle.hideActionBar8
+            if shouldHide == nil then
+                shouldHide = true -- default to hidden
+            end
+            MultiBar7:SetAlpha(shouldHide and 0 or 1)
         end
+    end
+    
+    function addon:actionBar8Changed(isChecked)
+        addon.updateUI.SetActionBar8Opacity()
     end
 end
 
@@ -223,13 +311,25 @@ end
 
 do
     function addon.updateUI.CustomizeMinimap()
-        local minimapWidth = 373
+        local minimapWidth = 248
         local minimapHeight = 248
         
         if Minimap then
             Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
             Minimap:SetSize(minimapWidth, minimapHeight)
             addon:addBorder(Minimap)
+            
+            -- Adjust zoom to compensate for rectangular aspect ratio
+            -- Zooming out helps reduce the vertical distortion
+            C_Timer.After(0.2, function()
+                if Minimap then
+                    local currentZoom = Minimap:GetZoom()
+                    -- Zoom out one level to reduce vertical coordinate distortion
+                    if currentZoom > 0 then
+                        Minimap:SetZoom(currentZoom - 1)
+                    end
+                end
+            end)
         end
         
         if MinimapBackdrop then
@@ -304,6 +404,166 @@ do
                 end)
             end)
         end
+    end
+end
+
+-- ===========================================================================
+-- INFO BOX
+-- ===========================================================================
+
+do
+    local function UpdateInfoBox(frame)
+        if not frame or not frame:IsShown() then return end
+        
+        -- Item Level
+        local avgItemLevel, avgItemLevelEquipped, avgItemLevelPvp = GetAverageItemLevel()
+        
+        -- PvP Item Level (only show if different and higher)
+        local pvpilvl = ""
+        if avgItemLevelPvp and avgItemLevelPvp > 0 and avgItemLevelPvp > avgItemLevelEquipped then
+            pvpilvl = string.format("/%.0f", avgItemLevelPvp)
+        end
+        
+        frame.ilvl:SetText(string.format("iLvl:  %.0f%s", avgItemLevelEquipped, pvpilvl))
+       
+        -- Total Gold
+        local gold = GetMoney() / 10000
+        local goldFormatted = tostring(math.floor(gold)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+        frame.gold:SetText(string.format("Gold:  %s", goldFormatted))
+        
+        -- Conquest
+        local conquestInfo = C_CurrencyInfo.GetCurrencyInfo(1602)
+        local conquest = conquestInfo and conquestInfo.quantity or 0
+        frame.conquest:SetText(string.format("Conq:  %d", conquest))
+        
+        -- Honor
+        local honorInfo = C_CurrencyInfo.GetCurrencyInfo(1792)
+        local honor = honorInfo and honorInfo.quantity or 0
+        frame.honor:SetText(string.format("Honor: %d", honor))
+        
+        -- Movement Speed
+        local speed = GetUnitSpeed("player") / 7 * 100
+        frame.speed:SetText(string.format("Speed: %.0f%%", speed))
+        
+        -- Durability
+        local totalDur, maxDur = 0, 0
+        for i = 1, 18 do
+            local curDur, maxDurSlot = GetInventoryItemDurability(i)
+            if curDur and maxDurSlot then
+                totalDur = totalDur + curDur
+                maxDur = maxDur + maxDurSlot
+            end
+        end
+        local durPercent = maxDur > 0 and (totalDur / maxDur * 100) or 100
+        frame.durability:SetText(string.format("Repairs:  %.0f%%", durPercent))
+        
+        -- Secondary Stats
+        local vers = GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE) + GetVersatilityBonus(CR_VERSATILITY_DAMAGE_DONE)
+        local haste = GetHaste()
+        local mastery = GetMasteryEffect()
+        frame.vers:SetText(string.format("Vers:    %.1f%%", vers))
+        frame.haste:SetText(string.format("Haste:   %.1f%%", haste))
+        frame.mastery:SetText(string.format("Mastery: %.1f%%", mastery))
+        
+        -- FPS and Latency
+        local fps = GetFramerate()
+        local _, _, latencyHome, latencyWorld = GetNetStats()
+        frame.fps:SetText(string.format("FPS:   %.0f", fps))
+        frame.ping:SetText(string.format("Ping:  %d/%d", latencyHome, latencyWorld))
+    end
+    
+    function addon.updateUI.CreateInfoBox()
+        if addon.SAdUI_InfoBox then return end
+        
+        local infoBox = CreateFrame("Frame", nil, UIParent)
+        infoBox:SetSize(125, 248)
+        infoBox:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0)
+        
+        local bg = infoBox:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(infoBox)
+        bg:SetColorTexture(0, 0, 0, 0.6)
+        
+        -- Create text elements
+        local yOffset = -10
+        
+        -- Get the saved font preference or use default
+        local selectedFont = addon.savedVars.markerStyle.font or "Interface/AddOns/SAdUI/Media/Fonts/FiraMonoMedium.ttf"
+        
+        infoBox.ilvl = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.ilvl:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.ilvl:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.ilvl:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT - DIVIDER_HEIGHT
+        
+        
+        infoBox.gold = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.gold:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.gold:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.gold:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT
+        
+        infoBox.conquest = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.conquest:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.conquest:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.conquest:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT
+        
+        infoBox.honor = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.honor:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.honor:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.honor:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT
+        
+        infoBox.durability = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.durability:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.durability:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.durability:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT - DIVIDER_HEIGHT
+        
+        infoBox.vers = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.vers:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.vers:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.vers:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT
+        
+        infoBox.haste = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.haste:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.haste:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.haste:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT
+        
+        infoBox.mastery = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.mastery:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.mastery:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.mastery:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT - DIVIDER_HEIGHT
+        
+        infoBox.speed = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.speed:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.speed:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.speed:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT
+
+        infoBox.fps = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.fps:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.fps:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.fps:SetJustifyH("LEFT")
+        yOffset = yOffset - INFOBOX_LINE_HEIGHT
+        
+        infoBox.ping = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        infoBox.ping:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
+        infoBox.ping:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
+        infoBox.ping:SetJustifyH("LEFT")
+        
+        addon.SAdUI_InfoBox = infoBox
+        
+        -- Update every 0.5 seconds
+        C_Timer.NewTicker(0.5, function()
+            UpdateInfoBox(infoBox)
+        end)
+        
+        -- Initial update
+        UpdateInfoBox(infoBox)
     end
 end
 
@@ -483,6 +743,34 @@ do
             CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleDamager:Hide()
             CompactRaidFrameManagerDisplayFrameFilterOptionsFilterRoleDamager:SetAlpha(0)
         end
+    end
+end
+
+-- ===========================================================================
+-- ARENA FRAME PORTRAITS: HIDE PORTRAITS
+-- ===========================================================================
+
+do
+    function addon.updateUI.HideArenaFramePortraits()
+        local function HidePortrait(frame)
+            if frame and frame.Portrait then
+                frame.Portrait:Hide()
+                frame.Portrait:SetAlpha(0)
+            end
+        end
+        
+        -- Hide portraits for all 5 arena frames
+        for i = 1, 5 do
+            local arenaFrame = _G["ArenaEnemyMatchFrame" .. i]
+            if arenaFrame then
+                HidePortrait(arenaFrame)
+            end
+        end
+        
+        -- Hook to hide portraits when frames are shown
+        hooksecurefunc("ArenaEnemyFrame_UpdatePlayer", function(frame)
+            HidePortrait(frame)
+        end)
     end
 end
 
@@ -877,5 +1165,73 @@ end
 --             animGroup:Play()
 --         end)
 --     end
+
+
+-- ===========================================================================
+-- POC: ZZZ Animation Frame (Like MotionSicknessFrame)
+-- ===========================================================================
+-- This creates a frame in the center of the screen that displays the same
+-- ZZZ animation that Blizzard uses for the MotionSicknessFrame (AFK indicator)
+-- ===========================================================================
+
+-- function addon:CreateZZZAnimationPOC()
+--     -- Create the main container frame
+--     local frame = CreateFrame("Frame", "SAdUI_ZZZ_POC", UIParent)
+--     frame:SetSize(200, 200)
+--     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    
+--     -- Make it movable for testing
+--     frame:SetMovable(true)
+--     frame:EnableMouse(true)
+--     frame:RegisterForDrag("LeftButton")
+--     frame:SetScript("OnDragStart", frame.StartMoving)
+--     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    
+--     -- Add a background so we can see the frame
+--     local bg = frame:CreateTexture(nil, "BACKGROUND")
+--     bg:SetAllPoints()
+--     bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+    
+--     -- Try using a Model frame instead of ModelScene
+--     local model = CreateFrame("Model", nil, frame)
+--     model:SetSize(150, 150)
+--     model:SetPoint("CENTER")
+    
+--     -- Set the model file directly
+--     model:SetModel(4542227)
+    
+--     -- Adjust camera and positioning
+--     model:SetCamera(0)
+--     model:SetPosition(0, 0, 0)
+--     model:SetFacing(0)
+    
+--     -- Try different scale values
+--     model:SetModelScale(3.0)
+    
+--     model:Show()
+    
+--     -- Store for debugging
+--     frame.model = model
+    
+--     -- Add a title text
+--     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+--     title:SetPoint("TOP", frame, "TOP", 0, -10)
+--     title:SetText("ZZZ Animation POC")
+--     title:SetTextColor(1, 1, 1, 1)
+    
+--     -- Add instruction text
+--     local instructions = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+--     instructions:SetPoint("BOTTOM", frame, "BOTTOM", 0, 10)
+--     instructions:SetText("Drag to move")
+--     instructions:SetTextColor(0.7, 0.7, 0.7, 1)
+    
+--     -- Store the frame for later access
+--     addon.ZZZ_POC_Frame = frame
+    
+--     -- Show the frame
+--     frame:Show()
+    
+--     print("|cFF00FF00SAdUI:|r ZZZ Animation POC created! Frame is in the center of the screen.")
 -- end
+-- -- end
 
