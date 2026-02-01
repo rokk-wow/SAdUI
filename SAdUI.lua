@@ -1,10 +1,3 @@
--- ===========================================================================
--- SADCORE FRAMEWORK INITIALIZATION (REQUIRED - DO NOT MODIFY)
--- ===========================================================================
--- This section is required by the SAdCore framework and must remain at the top.
--- The Initialize function is called by SAdCore during addon initialization.
--- ===========================================================================
-
 local addonName = ...
 local SAdCore = LibStub("SAdCore-1")
 local addon = SAdCore:GetAddon(addonName)
@@ -13,11 +6,19 @@ addon.sadCore.savedVarsGlobalName = "SAdUI_Settings_Global"
 addon.sadCore.savedVarsPerCharName = "SAdUI_Settings_Char"
 addon.sadCore.compartmentFuncName = "SAdUI_Compartment_Func"
 
+addon.onPlayerEnteringWorld = addon.onPlayerEnteringWorld or {}
+addon.onUpdateArena = addon.onUpdateArena or {}
+addon.onEditModeEnter = addon.onEditModeEnter or {}
+addon.arrangingPartyFrames = false
+addon.vars = {
+    borderWidth = 2,
+    borderColor = "000000FF",
+    iconZoom = .2
+}
+
 function addon:Initialize()
-    self.sadCore.version = "1.0"
     self.author = "Rôkk-Wyrmrest Accord"
 
-    -- Add Settings Panel using new AddSettingsPanel method (v1.13+)
     self:AddSettingsPanel("markerStyle", {
         title = "options",
         controls = {
@@ -50,154 +51,760 @@ function addon:Initialize()
                     {value = "Interface/AddOns/SAdUI/Media/Fonts/Micro.ttf", label = "Micro"}
                 },
                 onValueChange = self.fontChanged
-            },
-            {
-                type = "checkbox",
-                name = "hideActionBar8",
-                label = "Hide Action Bar 8",
-                default = true,
-                onValueChange = self.actionBar8Changed
             }
         }
     })
     
-    -- Event registration must be at the end of Initialize
-    addon:RegisterEvent("PLAYER_ENTERING_WORLD", addon.OnPlayerEnteringWorld)
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", self.onPlayerEnteringWorldHandler)
+    self:RegisterEvent("ARENA_PREP_OPPONENT_SPECIALIZATIONS", self.onUpdateArenaHandler)
+    self:RegisterEvent("ARENA_OPPONENT_UPDATE", self.onUpdateArenaHandler)
+    self:RegisterEvent("GROUP_ROSTER_UPDATE", self.onUpdateArenaHandler)
+    self:RegisterFrameEvent("EditMode.Enter", self.onEditModeEnterHandler)
 end
 
--- InfoBox configuration constants
-local INFOBOX_FONT_SIZE = 12
-local INFOBOX_LINE_HEIGHT = 18
-local DIVIDER_HEIGHT = 10
-
-function addon:fontChanged(fontPath)
-    if not addon.SAdUI_InfoBox then
-        return
-    end
-    
-    local fontStrings = {
-        addon.SAdUI_InfoBox.ilvl,
-        addon.SAdUI_InfoBox.gold,
-        addon.SAdUI_InfoBox.conquest,
-        addon.SAdUI_InfoBox.honor,
-        addon.SAdUI_InfoBox.speed,
-        addon.SAdUI_InfoBox.durability,
-        addon.SAdUI_InfoBox.vers,
-        addon.SAdUI_InfoBox.haste,
-        addon.SAdUI_InfoBox.mastery,
-        addon.SAdUI_InfoBox.fps,
-        addon.SAdUI_InfoBox.ping
-    }
-    
-    for i, fontString in ipairs(fontStrings) do
-        if fontString then
-            local currentText = fontString:GetText()
-            fontString:SetFont(fontPath, INFOBOX_FONT_SIZE, "OUTLINE")
-            if currentText then
-                fontString:SetText("")
-                fontString:SetText(currentText)
-            end
-        end
-    end
-end
-
-function addon.OnPlayerEnteringWorld()
-    for funcName, func in pairs(addon.updateUI) do
+function addon.onPlayerEnteringWorldHandler()
+    for funcName, func in pairs(addon.onPlayerEnteringWorld) do
         if type(func) == "function" then
-            func()
+            addon:CombatSafe(function()
+                func(addon)
+            end)
         end
     end
 end
 
-addon.vars = {
-    borderWidth = 2,
-    borderColor = "000000FF",
-    iconZoom = .2
-}
+function addon.onUpdateArenaHandler()
+    for funcName, func in pairs(addon.onUpdateArena) do
+        if type(func) == "function" then
+            addon:CombatSafe(function()
+                func(addon)
+            end)
+        end
+    end
+end
 
-addon.updateUI = {}
-
-do -- Shared functions
-    function addon:addBorder(bar, borderWidth, borderColor)
-        if not bar then return end
-        
-        local size = borderWidth or self.vars.borderWidth
-        local colorHex = borderColor or self.vars.borderColor
-        local r, g, b, a = self:HexToRGB(colorHex)
-        
-        local borders = bar.SAdUnitFrames_Borders
-        
-        if borders then
-            borders.top:SetColorTexture(r, g, b, a)
-            borders.top:SetHeight(size)
-            borders.bottom:SetColorTexture(r, g, b, a)
-            borders.bottom:SetHeight(size)
-            borders.left:SetColorTexture(r, g, b, a)
-            borders.left:SetWidth(size)
-            borders.right:SetColorTexture(r, g, b, a)
-            borders.right:SetWidth(size)
-        else
-            borders = {}
-            
-            borders.top = bar:CreateTexture(nil, "OVERLAY")
-            borders.top:SetColorTexture(r, g, b, a)
-            borders.top:SetHeight(size)
-            borders.top:ClearAllPoints()
-            borders.top:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
-            borders.top:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-            
-            borders.bottom = bar:CreateTexture(nil, "OVERLAY")
-            borders.bottom:SetColorTexture(r, g, b, a)
-            borders.bottom:SetHeight(size)
-            borders.bottom:ClearAllPoints()
-            borders.bottom:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-            borders.bottom:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-            
-            borders.left = bar:CreateTexture(nil, "OVERLAY")
-            borders.left:SetColorTexture(r, g, b, a)
-            borders.left:SetWidth(size)
-            borders.left:ClearAllPoints()
-            borders.left:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
-            borders.left:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-            
-            borders.right = bar:CreateTexture(nil, "OVERLAY")
-            borders.right:SetColorTexture(r, g, b, a)
-            borders.right:SetWidth(size)
-            borders.right:ClearAllPoints()
-            borders.right:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-            borders.right:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-            
-            bar.SAdUnitFrames_Borders = borders
+function addon.onEditModeEnterHandler()
+    for funcName, func in pairs(addon.onEditModeEnter) do
+        if type(func) == "function" then
+            addon:CombatSafe(function()
+                func(addon)
+            end)
         end
     end
 end
 
 -- ===========================================================================
--- ACTION BAR 8 OPACITY
+-- REMOVE ARENA GAP
+-- ===========================================================================
+do
+    function addon.onPlayerEnteringWorld.RemoveArenaFramesGap(self)
+        addon:CombatSafe(function()
+            addon.RemoveArenaFramesGap(addon)
+        end)
+    end
+
+    function addon.onUpdateArena.RemoveArenaFramesGap(self)
+        addon:CombatSafe(function()
+            addon.RemoveArenaFramesGap(addon)
+        end)
+    end
+
+    function addon.onEditModeEnter.RemoveArenaFramesGap(self)
+        addon:CombatSafe(function()
+            addon.RemoveArenaFramesGap(addon)
+        end)
+    end
+
+    function addon:RemoveArenaFramesGap()
+        self:Debug("RemoveArenaFramesGap")
+        
+        local arena1 = CompactArenaFrameMember1
+        local arena2 = CompactArenaFrameMember2
+        local arena3 = CompactArenaFrameMember3
+        
+        if not arena1 then
+            return false
+        end
+    
+        self:HookArenaFrames()
+        
+        self:CombatSafe(function()
+            self.isRepositioningArenaFrames = true
+            if arena2 then
+                arena2:ClearAllPoints()
+                arena2:SetPoint("TOP", arena1, "BOTTOM", 0, 0)
+            end
+            
+            if arena3 and arena2 then
+                arena3:ClearAllPoints()
+                arena3:SetPoint("TOP", arena2, "BOTTOM", 0, 0)
+            end
+            
+            self.isRepositioningArenaFrames = false
+        end)
+        
+        return true
+    end
+
+    function addon:HookArenaFrames()
+        self:Debug("HookArenaFrames")
+        
+        local arena1 = CompactArenaFrameMember1
+        local arena2 = CompactArenaFrameMember2
+        local arena3 = CompactArenaFrameMember3
+        
+        if self.arenaFramesHooked then
+            return
+        end
+        
+        if not arena1 or not arena2 then
+            return
+        end
+        
+        hooksecurefunc(arena2, "SetPoint", function(frame)
+            if self.isRepositioningArenaFrames then
+                return
+            end
+            
+            if not self:GetValue("options", "removeArenaFramesGap") then
+                return
+            end
+            
+            if not arena1 or not arena1:IsShown() then
+                return
+            end
+            
+            local numPoints = frame:GetNumPoints()
+            if numPoints == 1 then
+                local success, point, relativeTo, relativePoint, x, y = pcall(function()
+                    return frame:GetPoint(1)
+                end)
+                
+                if not success then
+                    return
+                end
+                
+                if relativeTo ~= arena1 or point ~= "TOP" or relativePoint ~= "BOTTOM" or y ~= 0 then
+                    self:CombatSafe(function()
+                        self.isRepositioningArenaFrames = true
+                        frame:ClearAllPoints()
+                        frame:SetPoint("TOP", arena1, "BOTTOM", 0, 0)
+                        self.isRepositioningArenaFrames = false
+                    end)
+                end
+            end
+        end)
+        
+        if arena3 then
+            hooksecurefunc(arena3, "SetPoint", function(frame)
+                if self.isRepositioningArenaFrames then
+                    return
+                end
+                
+                if not self:GetValue("options", "removeArenaFramesGap") then
+                    return
+                end
+                
+                if not arena2 or not arena2:IsShown() then
+                    return
+                end
+                
+                local numPoints = frame:GetNumPoints()
+                if numPoints == 1 then
+                    local success, point, relativeTo, relativePoint, x, y = pcall(function()
+                        return frame:GetPoint(1)
+                    end)
+                    
+                    if not success then
+                        return
+                    end
+                    
+                    if relativeTo ~= arena2 or point ~= "TOP" or relativePoint ~= "BOTTOM" or y ~= 0 then
+                        self:CombatSafe(function()
+                            self.isRepositioningArenaFrames = true
+                            frame:ClearAllPoints()
+                            frame:SetPoint("TOP", arena2, "BOTTOM", 0, 0)
+                            self.isRepositioningArenaFrames = false
+                        end)
+                    end
+                end
+            end)
+        end
+        
+        self.arenaFramesHooked = true
+    end
+end
+
+-- ===========================================================================
+-- SORT PARTY FRAMES
 -- ===========================================================================
 
 do
-    function addon.updateUI.SetActionBar8Opacity()
-        if MultiBar7 then
-            local shouldHide = addon.savedVars.markerStyle.hideActionBar8
-            if shouldHide == nil then
-                shouldHide = true -- default to hidden
-            end
-            MultiBar7:SetAlpha(shouldHide and 0 or 1)
+    function addon.onPlayerEnteringWorld.SortPartyFrames(self)
+        addon:CombatSafe(function()
+            addon.onUpdateArena.SortPartyFrames(addon)
+        end)
+    end
+
+    function addon.onUpdateArena.SortPartyFrames(self)
+        self.unitFor = self.unitFor or {}
+        self.frameFor = self.frameFor or {}
+        
+        if not CompactPartyFrameMember1 or not CompactPartyFrameMember1:IsShown() then
+            return
         end
+        
+        local partyFrames = {
+            CompactPartyFrameMember1,
+            CompactPartyFrameMember2,
+            CompactPartyFrameMember3
+        }
+
+        local playerFrame = self:GetFrameForUnit("player")
+        local party1Frame = self:GetFrameForUnit("party1")
+        local party2Frame = self:GetFrameForUnit("party2")
+        
+        if not playerFrame or not party1Frame or not party2Frame then
+            return
+        end
+
+        if (self.frameFor["player"] == "CompactPartyFrameMember1") and 
+           (self.frameFor["party1"] == "CompactPartyFrameMember2") and 
+           (self.frameFor["party2"] == "CompactPartyFrameMember3") then
+            return
+        else
+            print("Sorting Wrong Order")
+            print("player > " .. tostring(self.frameFor["player"]))
+            print("party1 > " .. tostring(self.frameFor["party1"]))
+            print("party2 > " .. tostring(self.frameFor["party2"]))
+        end
+
+        self:ArrangePartyFrames(playerFrame, party1Frame, party2Frame)
+    end
+
+    function addon:GetFrameForUnit(unit)
+        if not unit then
+            return nil
+        end
+        
+        self.unitFor = self.unitFor or {}
+        self.frameFor = self.frameFor or {}
+        
+        local framesToSearch = {
+            CompactPartyFrameMember1,
+            CompactPartyFrameMember2,
+            CompactPartyFrameMember3,
+            CompactArenaFrameMember1,
+            CompactArenaFrameMember2,
+            CompactArenaFrameMember3
+        }
+        
+        for _, frame in ipairs(framesToSearch) do
+            if frame and frame.unit then
+                local isMatch = self:SecureCall(UnitIsUnit, frame.unit, unit)
+                if isMatch == true then
+                    local frameName = frame:GetName()
+                    self.unitFor[frame] = unit
+                    self.frameFor[unit] = frameName
+                    return frame
+                end
+            end
+        end
+
+        return nil
     end
     
-    function addon:actionBar8Changed(isChecked)
-        addon.updateUI.SetActionBar8Opacity()
+    function addon:ArrangePartyFrames(firstFrame, secondFrame, thirdFrame)
+        local exit = false
+        if exit == true then return end
+        
+        if self.arrangingPartyFrames then
+            return
+        end
+        
+        if not firstFrame or not secondFrame or not thirdFrame then
+            return
+        end
+        
+        self.arrangingPartyFrames = true
+
+        -- Get the container frame (parent of party frames)
+        local container = firstFrame:GetParent()
+        if not container then
+            self.arrangingPartyFrames = false
+            return
+        end
+        
+        -- Use TOPLEFT anchor point like FrameSort does
+        local anchorPoint = "TOPLEFT"
+        local frameHeight = firstFrame:GetHeight() or 0
+        
+        firstFrame:ClearAllPoints()
+        firstFrame:SetPoint(anchorPoint, container, anchorPoint, 0, 0)
+        
+        secondFrame:ClearAllPoints()
+        secondFrame:SetPoint(anchorPoint, container, anchorPoint, 0, -frameHeight)
+        
+        thirdFrame:ClearAllPoints()
+        thirdFrame:SetPoint(anchorPoint, container, anchorPoint, 0, -frameHeight * 2)
+        
+        
+        -- Reset flag to allow future executions
+        self.arrangingPartyFrames = false
     end
 end
+
+-- ===========================================================================
+-- UPDATE WOW SETTINGS
+-- ===========================================================================
+
+do
+    function addon.onPlayerEnteringWorld.UpdateSettings(self)
+        -- ==============================================================
+        -- CONTROLS
+        -- ==============================================================
+        SetCVar("stickyTargeting", 1)                   -- Sticky Targeting: true
+        SetCVar("autoDismount", 1)                      -- Auto dismount in flight: true
+        SetCVar("autoClearAFK", 1)                      -- Auto cancel away mode: true
+        SetCVar("interactOnLeftClick", 1)               -- Interact on left click: true
+        SetCVar("lootUnderMouse", 0)                    -- Open loot window at mouse: false
+        SetCVar("autoLootDefault", 1)                   -- Auto loot: true
+        SetCVar("combinedBags", 0)                      -- Combine bags: false
+        SetCVar("softTargettingInteractKeySound", 0)    -- Interact key sound cue: false
+        
+        -- CONTROLS > MOUSE
+        SetCVar("lockCursorToWindow", 0)                -- Lock cursor to window: false
+        SetCVar("mouseInvertPitch", 0)                  -- Invert mouse: false
+        SetCVar("mouseSpeed", 5.5)                      -- Mouse look speed: 5.5
+        -- Enable mouse sensitivity: false - may not have CVar
+        SetCVar("enableMouseSpeed", 0)                  -- Enable mouse sensitivity
+        SetCVar("autoInteract", 0)                      -- Click-to-move: false
+        
+        -- CONTROLS > CAMERA
+        SetCVar("cameraWaterCollision", 0)              -- Water collision: false
+        SetCVar("cameraFollowSpeed", 5.5)               -- Auto follow speed: 5.5
+        SetCVar("cameraYawMoveSpeed", 0)                -- Camera following style: never adjust (0)
+        
+        -- ==============================================================
+        -- INTERFACE > DISPLAY
+        -- ==============================================================
+        SetCVar("showInGameNavigation", 1)              -- In game navigation: true
+        SetCVar("showTutorials", 0)                     -- Tutorials: false
+        SetCVar("statusTextDisplay", "BOTH")            -- Status text: both
+        SetCVar("chatBubbles", 0)                       -- Chat bubbles: false
+        SetCVar("chatBubblesParty", 0)                  -- Party chat bubbles: false
+        SetCVar("chatBubblesParty", 0)                  -- Raid chat bubbles: false (same CVar)
+        
+        -- INTERFACE > QUESTS
+        SetCVar("showLowLevelQuests", 1)                -- Show low-level quests: true
+        
+        -- INTERFACE > RAID FRAMES
+        SetCVar("raidFramesDisplayIncomingHeals", 0)    -- Display incoming heals: false
+        SetCVar("raidFramesDisplayPowerBars", 1)        -- Display power bars: true
+        SetCVar("raidFramesDisplayOnlyHealerPowerBars", 1) -- Display only healer power bars: true
+        SetCVar("raidFramesDisplayAggroHighlight", 1)   -- Display aggro highlight: true
+        SetCVar("raidFramesDisplayClassColor", 1)       -- Display class colors: true
+        SetCVar("raidFramesDisplayPets", 0)             -- Display pets: false
+        SetCVar("raidFramesDisplayMainTankAndAssist", 0) -- Display main tank and assist: false
+        SetCVar("raidFramesDisplayDebuffs", 1)          -- Show debuffs: true
+        SetCVar("raidFramesDisplayOnlyDispellableDebuffs", 1) -- Display only dispellable debuffs: true
+        SetCVar("raidFramesHealthText", "none")         -- Display health text: none
+        
+        -- ==============================================================
+        -- ACTION BARS
+        -- ==============================================================
+        -- Note: PROXY_SHOW_ACTIONBAR_* requires Settings.SetValue(), not SetCVar()
+        Settings.SetValue("PROXY_SHOW_ACTIONBAR_2", true)   -- Bar 2 (Bottom Left): true
+        Settings.SetValue("PROXY_SHOW_ACTIONBAR_3", true)   -- Bar 3 (Bottom Right): true
+        Settings.SetValue("PROXY_SHOW_ACTIONBAR_4", true)   -- Bar 4 (Right Bar 1): true
+        Settings.SetValue("PROXY_SHOW_ACTIONBAR_5", true)   -- Bar 5 (Right Bar 2): true
+        Settings.SetValue("PROXY_SHOW_ACTIONBAR_6", false)  -- Bar 6: false
+        Settings.SetValue("PROXY_SHOW_ACTIONBAR_7", false)  -- Bar 7: false
+        Settings.SetValue("PROXY_SHOW_ACTIONBAR_8", false)  -- Bar 8: false
+        SetCVar("lockActionBars", 0)                        -- Lock action bars: false
+        SetCVar("countdownForCooldowns", 1)                 -- Show numbers for cooldowns: true
+        
+        -- ==============================================================
+        -- COMBAT
+        -- ==============================================================
+        SetCVar("nameplateResourceOnTarget", 0)         -- Personal resource display: false
+        SetCVar("selfHighlight", 0)                     -- Self highlight: off
+        SetCVar("showTargetOfTarget", 1)                -- Target of target: true
+        SetCVar("ffxDeath", 1)                          -- Do not flash screen at low health: false (1 = flash enabled)
+        SetCVar("lossOfControl", 1)                     -- Loss of control alerts: true
+        SetCVar("floatingCombatTextCombatDamage", 0)    -- Scrolling combat text for self: false
+        SetCVar("autoSelfCast", 1)                      -- Self cast: auto
+        SetCVar("empowerTapControls", 0)                -- Empowered spell input: hold and release (0 = hold/release, 1 = press/tap)
+        SetCVar("spellActivationOverlayOpacity", 1.0)   -- Spell alert opacity: 100%
+        
+        -- ==============================================================
+        -- SOCIAL
+        -- ==============================================================
+        SetCVar("profanityFilter", 0)                   -- Mature language filter: false
+        SetCVar("guildMemberNotify", 1)                 -- Guild member alert: true
+        SetCVar("blockTrades", 1)                       -- Block trades: true
+        SetCVar("blockGuildInvites", 1)                 -- Block guild invites: true
+        SetCVar("blockChannelInvites", 0)               -- Block chat channel invites: false
+        SetCVar("showToastOnline", 1)                   -- Online friends: true
+        SetCVar("showToastOffline", 1)                  -- Offline friends: true
+        SetCVar("showToastBroadcast", 0)                -- Broadcast updates: false
+        SetCVar("showToastWindow", 0)                   -- Show toast window: false
+        SetCVar("chatStyle", "im")                      -- Chat style: IM Style
+        SetCVar("whisperMode", "inline")                -- New whispers: in-line
+        SetCVar("showTimestamps", "none")               -- Chat timestamps: none
+        
+        -- ==============================================================
+        -- PING SYSTEM
+        -- ==============================================================
+        SetCVar("enablePings", 1)                       -- Enable pings: true
+        SetCVar("pingMode", 0)                          -- Ping mode: quick ping (0 = quick ping)
+        SetCVar("Sound_EnablePingSounds", 1)            -- Ping sounds: true
+        SetCVar("showPingsInChat", 1)                   -- Show pings in chat: true
+        
+        -- ==============================================================
+        -- NAMEPLATES
+        -- ==============================================================
+        -- NAMEPLATES > NAMES
+        SetCVar("UnitNameOwn", 0)                       -- My name: false
+        SetCVar("UnitNameNPC", 1)                       -- NPC Names: enabled (hostile, quest, interactive)
+        SetCVar("nameplateShowFriendlyPets", 0)         -- Critters and companions: false
+        SetCVar("nameplateShowFriends", 1)              -- Friendly players: true
+        SetCVar("nameplateShowFriendlyMinions", 0)      -- Friendly minions: false
+        SetCVar("UnitNameEnemyPlayerName", 1)           -- Enemy players: true
+        SetCVar("nameplateShowEnemyMinions", 0)         -- Enemy minions: false
+        
+        -- NAMEPLATES > NAMEPLATES
+        SetCVar("nameplateShowAll", 1)                  -- Always show nameplates: true
+        SetCVar("nameplateShowEnemies", 1)              -- Enemy unit nameplates: true
+        SetCVar("nameplateShowEnemyMinions", 1)         -- Enemy minions: true
+        SetCVar("nameplateShowEnemyMinus", 0)           -- Enemy minor: false
+        SetCVar("nameplateShowFriends", 1)              -- Friendly player nameplates: true
+        SetCVar("nameplateShowFriendlyMinions", 0)      -- Friendly minions: false
+        SetCVar("nameplateShowFriendlyNPCs", 0)         -- Friendly NPC nameplates: false
+        SetCVar("nameplateOtherTopInset", 0.08)         -- Show offscreen nameplates: true
+        SetCVar("nameplateGlobalScale", 2.0)            -- Size: 2
+        SetCVar("nameplateLargerScale", 1.4)            -- Buff/debuff scale: 140%
+        
+        -- ==============================================================
+        -- ACCESSIBILITY
+        -- ==============================================================
+        SetCVar("uiScale", 1.0)                         -- Text scale: medium (use 1.0 for medium)
+        SetCVar("questTextContrast", 0)                 -- Quest text contrast: default (0 = default)
+        SetCVar("ffxSpecial", 1)                        -- Enable photosensitivity mode: false (1 = effects enabled)
+        SetCVar("minimumCharacterNameSize", 0)          -- Minimum character name size: 0
+        SetCVar("cameraDistanceMaxZoomFactor", 2.6)     -- Motion sickness: false (default zoom)
+        SetCVar("cursorSizePreferred", 3)               -- Cursor size: 64x64 (3 = large)
+        SetCVar("selfHighlight", 0)                     -- Self highlight: off
+        SetCVar("spellActivationOverlayOpacity", 1.0)   -- Spell alert opacity: 100%
+        SetCVar("overrideArchive", 0)                   -- Arachnophobia mode: false
+        
+        -- ACCESSIBILITY > COLORS
+        SetCVar("colorblindMode", 0)                    -- Enable UI colorblind mode: false
+        SetCVar("colorblindSimulator", 0)               -- Colorblind filter: none (0 = none)
+        SetCVar("colorblindWeaknessFactor", 0.5)        -- Colorblind sensitivity: 0.5 (0.0-1.0)
+        
+        -- ACCESSIBILITY > SUBTITLES
+        SetCVar("movieSubtitle", 1)                     -- Cinematic subtitles: true
+        
+        -- ==============================================================
+        -- SYSTEM > GRAPHICS
+        -- ==============================================================
+        SetCVar("gxWindow", 1)                          -- Display mode: fullscreen (windowed)
+        SetCVar("gxWindowedResolution", "1920x1080")    -- Resolution: 1920x1080
+        SetCVar("renderScale", 1.0)                     -- Render scale: 100%
+        SetCVar("useUiScale", 0)                        -- Use UI scale: false
+        SetCVar("gxVSync", 1)                           -- Vertical sync: enabled
+        SetCVar("gxMaximize", 1)                        -- Low latency mode: enabled
+        SetCVar("MSAAQuality", 0)                       -- Anti-aliasing: none
+        SetCVar("cameraFov", 90)                        -- Camera FOV: 90
+        
+        -- SYSTEM > GRAPHICS > GRAPHICS QUALITY
+        SetCVar("graphicsQuality", 7)                   -- Base game quality: 7
+        SetCVar("cameraDistanceMaxZoomFactor", 2.6)     -- View distance: 10 (using max zoom)
+        SetCVar("environmentDetail", 1)                 -- Environment detail: 1
+        SetCVar("groundEffectDensity", 1)               -- Ground clutter: 1
+        
+        -- ==============================================================
+        -- SYSTEM > AUDIO
+        -- ==============================================================
+        SetCVar("Sound_EnableAllSound", 1)              -- Enable sound: true
+        SetCVar("Sound_MasterVolume", 0.5)              -- Master volume: 50%
+        SetCVar("Sound_MusicVolume", 0)                 -- Music: 0%
+        SetCVar("Sound_SFXVolume", 1.0)                 -- Effects: 100%
+        SetCVar("Sound_AmbienceVolume", 0)              -- Ambience: 0%
+        SetCVar("Sound_DialogVolume", 1.0)              -- Dialog: 100%
+        SetCVar("Sound_EnableMusic", 0)                 -- Music: false
+        SetCVar("Sound_LoopMusic", 1)                   -- Loop music: true
+        SetCVar("Sound_EnablePetBattleMusic", 1)        -- Pet battle music: true
+        SetCVar("Sound_EnableSFX", 1)                   -- Sound effects: true
+        SetCVar("Sound_EnablePetSounds", 0)             -- Enable pet sounds: false
+        SetCVar("Sound_EnableEmoteSounds", 0)           -- Emote sounds: false
+        SetCVar("Sound_EnableErrorSpeech", 0)           -- Error speech: false
+        SetCVar("Sound_EnableSoundWhenGameIsInBG", 1)   -- Sound in background: true
+        SetCVar("Sound_EnableReverb", 0)                -- Enable reverb: false
+        SetCVar("Sound_NumChannels", 64)                -- Audio channels: 64
+        SetCVar("Sound_CacheSize", 3)                   -- Audio cache size: Large (128MB) - 3 = Large
+        
+        -- ==============================================================
+        -- SYSTEM > NETWORK
+        -- ==============================================================
+        SetCVar("advancedCombatLogging", 1)             -- Advanced combat logging: true
+    end
+end
+
+-- ===========================================================================
+-- ADDITIONAL NEW SETTINGS (UI/API Implementation Required)
+-- ===========================================================================
+
+-- do
+--     function addon.onPlayerEnteringWorld.UpdateAdditionalSettings(self)
+--         
+--         -- INTERFACE > DISPLAY
+--         -- Replace player frame portraits: false
+--         -- Replace my frame portrait: false
+--         
+--         -- INTERFACE > QUESTS
+--         -- Show warband completed quests: true
+--         
+--         -- INTERFACE > RAID FRAMES
+--         -- Bigger role debuffs: true
+--         -- Center big defensives: true
+--         -- Dispellable debuff indicator: dispellable by me
+--         -- Dispellable debuff color: false
+--         
+--         -- INTERFACE > ARENA ENEMY FRAMES
+--         -- Display power bar: true
+--         -- Display only healer power bar: true
+--         -- Display class colors: true
+--         -- Display pets: false
+--         -- Display health text: none
+--         
+--         -- COMBAT
+--         -- Show silhouette when obscured: true
+--         -- Press and hold casting: false
+--         -- Enable action targeting: true
+--         
+--         -- SOCIAL
+--         -- Disable chat: false
+--         -- Real time chat filtering: everyone
+--         -- Block neighborhood invites: true
+--         -- Restrict calendar invites: true
+--         -- Location visibility: friends, recent allies, and guildmates
+--         -- Real ID and battletag friend requests: true
+--         -- Auto accept quick join requests: true
+--         
+--         -- GAMEPLAY ENHANCEMENTS > COMBAT ASSISTANT
+--         -- Assisted highlight: true
+--         
+--         -- GAMEPLAY ENHANCEMENTS > BOSS WARNINGS
+--         -- Enable boss warnings: true
+--         -- Enable text warnings: true
+--         -- Text warning level: Critical Priority
+--         -- Hide when not targeted: true
+--         -- Enable boss timeline: true
+--         -- Hide long countdowns: true
+--         -- Hide queued countdowns: false
+--         -- Hide countdowns for other roles: true
+--         -- Spell support iconography: true
+--         -- Spell support icon types: Healer Alerts, Dispellable, Deadly
+--         
+--         -- GAMEPLAY ENHANCEMENTS > COOLDOWN MANAGER
+--         -- Enable cooldown manager: true
+--         
+--         -- GAMEPLAY ENHANCEMENTS > EXTERNAL DEFENSIVES
+--         -- Enable external defensives: false
+--         
+--         -- GAMEPLAY ENHANCEMENTS > DAMAGE METER
+--         -- Damage meter: true
+--         
+--         -- GAMEPLAY ENHANCEMENTS > DIMINISHING RETURNS
+--         -- Diminishing returns tracking: true
+--         -- Only castable by me: true
+--         
+--         -- NAMEPLATES
+--         -- Style: legacy red
+--         -- Nameplate information: rarity icon
+--         -- Cast bar information: spell name, spell icon, highlight important casts
+--         -- Aggro display: progressive
+--         -- Enemy NPC buffs/debuffs: mob buffs, shared cc
+--         -- Enemy player buffs/debuffs: enemy buffs, big debuff
+--         -- Friendly player buffs/debuffs: personal buffs, big debuff
+--         -- Default padding: 0
+--         -- Simplify nameplates: minor, minion
+--         
+--         -- ACCESSIBILITY
+--         -- Show move pad: false
+--         -- Show target tooltip: false
+--         -- Interact key icons: npcs only
+--         
+--         -- ACCESSIBILITY > AUDIO ASSIST
+--         -- Transcribe voice chat: false
+--         -- Read chat text out loud: false
+--         -- Speak for me in voice chat: false
+--         -- Enable combat audio alerts: false
+--         
+--         -- ACCESSIBILITY > MOUNTS (Skyriding)
+--         -- Motion sickness: default
+--         -- Skyriding screen effects: true
+--         -- Skyriding speed effects: true
+--         -- Pitch control: default
+--         -- Debounce pitch control: false
+--         
+--         -- ACCESSIBILITY > SUBTITLES
+--         -- Subtitles background: dark
+--         -- Subtitles background opacity: 70%
+--         
+--         -- SYSTEM > AUDIO
+--         -- Boss warning sounds: true
+--         
+--         -- SYSTEM > NETWORK
+--         -- Optimize network for speed: true
+--         -- Enable IPv6 when available: false
+--     end
+-- end
+
+-- ===========================================================================
+-- UPDATE WOW KEY BINDINGS
+-- ===========================================================================
+-- NOTE: Keybindings require SetBinding() API, not CVars
+-- Format: SetBinding("KEY", "COMMAND")
+-- IMPORTANT: If a keybinding is NOT listed below but exists in WoW's
+-- Options interface panel under the designated category, it should be
+-- CLEARED/REMOVED using ClearBinding() or SetBinding("KEY", nil)
+-- ===========================================================================
+
+-- do
+--     function addon.onPlayerEnteringWorld.UpdateKeybindings(self)
+--         print("Configuring keybindings...")
+--         
+--         -- Clear all existing bindings first to ensure clean state
+--         -- This handles the requirement to remove unlisted bindings
+--         
+--         -- ==============================================================
+--         -- MOVEMENT KEYS
+--         -- ==============================================================
+--         SetBinding("E", "MOVEFORWARD")
+--         SetBinding("D", "MOVEBACKWARD")
+--         SetBinding("S", "STRAFELEFT")
+--         SetBinding("F", "STRAFERIGHT")
+--         SetBinding("SPACE", "JUMP")
+--         SetBinding("\\", "TOGGLESHEATH")
+--         SetBinding("SHIFT-BUTTON3", "TOGGLEAUTORUN")     -- Middle Mouse
+--         SetBinding("HOME", "TOGGLERUN")
+--         
+--         -- ==============================================================
+--         -- INTERFACE PANEL
+--         -- ==============================================================
+--         SetBinding("ESCAPE", "TOGGLEGAMEMENU")
+--         SetBinding("F1", "OPENALLBAGS")
+--         SetBinding("F2", "TOGGLECHARACTER0")
+--         SetBinding("F3", "TOGGLESPELLBOOK")
+--         SetBinding("F9", "TOGGLEACHIEVEMENT")
+--         SetBinding("M", "TOGGLEWORLDMAP")
+--         SetBinding("SHIFT-M", "TOGGLEBATTLEFIELDMINIMAP")
+--         SetBinding("N", "TOGGLEPVPSCOREBOARDORTAB")
+--         SetBinding("F6", "TOGGLEGUILDTAB")
+--         SetBinding("F7", "TOGGLESOCIAL")
+--         SetBinding("U", "TOGGLEGROUPFINDER")
+--         SetBinding("F5", "TOGGLECOLLECTIONS")
+--         SetBinding("SHIFT-F9", "TOGGLEENCOUNTERJOURNAL")
+--         
+--         -- ==============================================================
+--         -- ACTION BAR 1
+--         -- ==============================================================
+--         SetBinding("2", "ACTIONBUTTON1")
+--         SetBinding("3", "ACTIONBUTTON2")
+--         SetBinding("4", "ACTIONBUTTON3")
+--         SetBinding("5", "ACTIONBUTTON4")
+--         SetBinding("SHIFT-W", "ACTIONBUTTON5")
+--         SetBinding("SHIFT-R", "ACTIONBUTTON6")
+--         SetBinding("SHIFT-T", "ACTIONBUTTON7")
+--         SetBinding("SHIFT-G", "ACTIONBUTTON8")
+--         
+--         -- ==============================================================
+--         -- ACTION BAR 2
+--         -- ==============================================================
+--         SetBinding("X", "MULTIACTIONBAR1BUTTON1")
+--         SetBinding("C", "MULTIACTIONBAR1BUTTON2")
+--         SetBinding("V", "MULTIACTIONBAR1BUTTON3")
+--         SetBinding("SHIFT-V", "MULTIACTIONBAR1BUTTON4")
+--         SetBinding("PAGEDOWN", "MULTIACTIONBAR1BUTTON5")
+--         SetBinding("MOUSEWHEELDOWN", "MULTIACTIONBAR1BUTTON6")
+--         SetBinding("W", "MULTIACTIONBAR1BUTTON7")
+--         SetBinding("R", "MULTIACTIONBAR1BUTTON8")
+--         SetBinding("T", "MULTIACTIONBAR1BUTTON9")
+--         SetBinding("G", "MULTIACTIONBAR1BUTTON10")
+--         SetBinding("PAGEUP", "MULTIACTIONBAR1BUTTON11")
+--         SetBinding("MOUSEWHEELUP", "MULTIACTIONBAR1BUTTON12")
+--         
+--         -- ==============================================================
+--         -- ACTION BAR 3
+--         -- ==============================================================
+--         -- Note: Only buttons 5-12 are bound, others left unbound
+--         SetBinding("SHIFT-PAGEDOWN", "MULTIACTIONBAR2BUTTON5")
+--         SetBinding("SHIFT-MOUSEWHEELDOWN", "MULTIACTIONBAR2BUTTON6")
+--         SetBinding("BUTTON3", "MULTIACTIONBAR2BUTTON7")    -- Middle Mouse
+--         SetBinding("`", "MULTIACTIONBAR2BUTTON8")
+--         SetBinding("P", "MULTIACTIONBAR2BUTTON9")
+--         SetBinding("SHIFT-PAGEUP", "MULTIACTIONBAR2BUTTON11")
+--         SetBinding("SHIFT-MOUSEWHEELUP", "MULTIACTIONBAR2BUTTON12")
+--         
+--         -- ==============================================================
+--         -- ACTION BAR 4
+--         -- ==============================================================
+--         SetBinding("Z", "MULTIACTIONBAR3BUTTON1")
+--         SetBinding("B", "MULTIACTIONBAR3BUTTON2")
+--         SetBinding("L", "MULTIACTIONBAR3BUTTON3")
+--         SetBinding("A", "MULTIACTIONBAR3BUTTON4")
+--         SetBinding("H", "MULTIACTIONBAR3BUTTON5")
+--         SetBinding("K", "MULTIACTIONBAR3BUTTON6")
+--         SetBinding("Q", "MULTIACTIONBAR3BUTTON7")
+--         SetBinding("Y", "MULTIACTIONBAR3BUTTON8")
+--         SetBinding("J", "MULTIACTIONBAR3BUTTON9")
+--         
+--         -- ==============================================================
+--         -- CHAT
+--         -- ==============================================================
+--         SetBinding("ENTER", "OPENCHAT")
+--         SetBinding("/", "OPENCHATSLASH")
+--         
+--         -- ==============================================================
+--         -- TARGETING
+--         -- ==============================================================
+--         SetBinding("TAB", "TARGETNEARESTENEMY")
+--         SetBinding("F10", "NAMEPLATES")
+--         
+--         -- ==============================================================
+--         -- CAMERA
+--         -- ==============================================================
+--         SetBinding("CTRL-MOUSEWHEELUP", "CAMERAZOOMIN")
+--         SetBinding("CTRL-MOUSEWHEELDOWN", "CAMERAZOOMOUT")
+--         
+--         -- ==============================================================
+--         -- MISCELLANEOUS
+--         -- ==============================================================
+--         SetBinding("F11", "TOGGLEUI")
+--         
+--         -- ==============================================================
+--         -- CONTROLS
+--         -- ==============================================================
+--         -- interact with target keybind: End
+--         SetBinding("END", "INTERACTTARGET")
+--         
+--         -- Save bindings to account
+--         SaveBindings(GetCurrentBindingSet())
+--         
+--         print("Keybindings configured successfully.")
+--         print("NOTE: Loot key and Focus cast key are set to 'none' (no binding).")
+--     end
+-- end
+
 
 -- ===========================================================================
 -- FRAME HIDING: TOTEM FRAME
 -- ===========================================================================
 
 do
-    function addon.updateUI.HideTotemFrame()
+    function addon.onPlayerEnteringWorld.HideTotemFrame(self)
         if TotemFrame then
             TotemFrame:Hide()
             TotemFrame:SetAlpha(0)
@@ -215,7 +822,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.HideQuickJoinToastButton()
+    function addon.onPlayerEnteringWorld.HideQuickJoinToastButton(self)
         if QuickJoinToastButton then
             QuickJoinToastButton:Hide()
             QuickJoinToastButton:SetAlpha(0)
@@ -233,7 +840,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.HideChatFrameChannelButton()
+    function addon.onPlayerEnteringWorld.HideChatFrameChannelButton(self)
         if ChatFrameChannelButton then
             ChatFrameChannelButton:Hide()
             ChatFrameChannelButton:SetAlpha(0)
@@ -251,7 +858,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.SetCVars()
+    function addon.onPlayerEnteringWorld.SetCVars(self)
         SetCVar("mapFade", 0)
     end
 end
@@ -261,7 +868,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.CustomizeBattlefieldMap()
+    function addon.onPlayerEnteringWorld.CustomizeBattlefieldMap(self)
         local mapFrame = BattlefieldMapFrame
         if mapFrame then
             hooksecurefunc(mapFrame, "Show", function()
@@ -276,7 +883,7 @@ do
                         borderFrame:SetAllPoints(mapFrame.ScrollContainer)
                         mapFrame.ScrollContainer.SAdUI_BorderFrame = borderFrame
                     end
-                    addon:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
+                    self:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
                 end
             end)
             
@@ -291,12 +898,12 @@ do
                     borderFrame:SetAllPoints(mapFrame.ScrollContainer)
                     mapFrame.ScrollContainer.SAdUI_BorderFrame = borderFrame
                 end
-                addon:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
+                self:addBorder(mapFrame.ScrollContainer.SAdUI_BorderFrame)
             end
         end
     end
     
-    function addon.updateUI.ScaleZoneMap()
+    function addon.onPlayerEnteringWorld.ScaleZoneMap(self)
         local scale = 1.25
         local mapFrame = BattlefieldMapFrame
         if mapFrame then
@@ -310,14 +917,14 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.CustomizeMinimap()
+    function addon.onPlayerEnteringWorld.CustomizeMinimap(self)
         local minimapWidth = 248
         local minimapHeight = 248
         
         if Minimap then
             Minimap:SetMaskTexture("Interface\\Buttons\\WHITE8X8")
             Minimap:SetSize(minimapWidth, minimapHeight)
-            addon:addBorder(Minimap)
+            self:addBorder(Minimap)
             
             -- Adjust zoom to compensate for rectangular aspect ratio
             -- Zooming out helps reduce the vertical distortion
@@ -410,7 +1017,6 @@ end
 -- ===========================================================================
 -- INFO BOX
 -- ===========================================================================
-
 do
     local function UpdateInfoBox(frame)
         if not frame or not frame:IsShown() then return end
@@ -472,8 +1078,44 @@ do
         frame.ping:SetText(string.format("Ping:  %d/%d", latencyHome, latencyWorld))
     end
     
-    function addon.updateUI.CreateInfoBox()
-        if addon.SAdUI_InfoBox then return end
+    function addon.onPlayerEnteringWorld.CreateInfoBox(self)
+        -- InfoBox configuration constants
+        local INFOBOX_FONT_SIZE = 12
+        local INFOBOX_LINE_HEIGHT = 18
+        local DIVIDER_HEIGHT = 10
+
+        function self:fontChanged(fontPath)
+            if not self.SAdUI_InfoBox then
+                return
+            end
+            
+            local fontStrings = {
+                self.SAdUI_InfoBox.ilvl,
+                self.SAdUI_InfoBox.gold,
+                self.SAdUI_InfoBox.conquest,
+                self.SAdUI_InfoBox.honor,
+                self.SAdUI_InfoBox.speed,
+                self.SAdUI_InfoBox.durability,
+                self.SAdUI_InfoBox.vers,
+                self.SAdUI_InfoBox.haste,
+                self.SAdUI_InfoBox.mastery,
+                self.SAdUI_InfoBox.fps,
+                self.SAdUI_InfoBox.ping
+            }
+            
+            for i, fontString in ipairs(fontStrings) do
+                if fontString then
+                    local currentText = fontString:GetText()
+                    fontString:SetFont(fontPath, INFOBOX_FONT_SIZE, "OUTLINE")
+                    if currentText then
+                        fontString:SetText("")
+                        fontString:SetText(currentText)
+                    end
+                end
+            end
+        end
+
+        if self.SAdUI_InfoBox then return end
         
         local infoBox = CreateFrame("Frame", nil, UIParent)
         infoBox:SetSize(125, 248)
@@ -487,7 +1129,7 @@ do
         local yOffset = -10
         
         -- Get the saved font preference or use default
-        local selectedFont = addon.savedVars.markerStyle.font or "Interface/AddOns/SAdUI/Media/Fonts/FiraMonoMedium.ttf"
+        local selectedFont = self.savedVars.markerStyle.font or "Interface/AddOns/SAdUI/Media/Fonts/FiraMonoMedium.ttf"
         
         infoBox.ilvl = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         infoBox.ilvl:SetPoint("TOPLEFT", infoBox, "TOPLEFT", 5, yOffset)
@@ -555,7 +1197,7 @@ do
         infoBox.ping:SetFont(selectedFont, INFOBOX_FONT_SIZE, "OUTLINE")
         infoBox.ping:SetJustifyH("LEFT")
         
-        addon.SAdUI_InfoBox = infoBox
+        self.SAdUI_InfoBox = infoBox
         
         -- Update every 0.5 seconds
         C_Timer.NewTicker(0.5, function()
@@ -572,7 +1214,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.CustomizeClock()
+    function addon.onPlayerEnteringWorld.CustomizeClock(self)
         local clockButton = TimeManagerClockButton
         if clockButton then
             clockButton:ClearAllPoints()
@@ -597,7 +1239,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.unclampChatFrames()
+    function addon.onPlayerEnteringWorld.unclampChatFrames(self)
         for i = 1, NUM_CHAT_WINDOWS do
             local chatFrame = _G["ChatFrame" .. i]
             if chatFrame then
@@ -606,7 +1248,7 @@ do
         end
     end
     
-    function addon.updateUI.repositionChatEditBox()
+    function addon.onPlayerEnteringWorld.repositionChatEditBox(self)
         for i = 1, NUM_CHAT_WINDOWS do
             local editBox = _G["ChatFrame" .. i .. "EditBox"]
             if editBox then
@@ -694,7 +1336,7 @@ do
         return procGlow
     end
     
-    function addon.updateUI.addBuffIconGlow()
+    function addon.onPlayerEnteringWorld.addBuffIconGlow(self)
         local function OnUnitAura(event, unit)
             if unit ~= "player" then return end
             
@@ -709,7 +1351,7 @@ do
             end
         end
         
-        addon:RegisterEvent("UNIT_AURA", OnUnitAura)
+        self:RegisterEvent("UNIT_AURA", OnUnitAura)
     end
 end
 
@@ -718,7 +1360,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.CompactRaidFrameManagerVisibility()
+    function addon.onPlayerEnteringWorld.CompactRaidFrameManagerVisibility(self)
         if CompactRaidFrameManager then
             CompactRaidFrameManager:Hide()
             CompactRaidFrameManager:SetAlpha(0)
@@ -751,7 +1393,7 @@ end
 -- ===========================================================================
 
 do
-    function addon.updateUI.HideArenaFramePortraits()
+    function addon.onPlayerEnteringWorld.HideArenaFramePortraits(self)
         local function HidePortrait(frame)
             if frame and frame.Portrait then
                 frame.Portrait:Hide()
@@ -764,13 +1406,16 @@ do
             local arenaFrame = _G["ArenaEnemyMatchFrame" .. i]
             if arenaFrame then
                 HidePortrait(arenaFrame)
+                
+                -- Hook the frame's Show method to ensure portraits stay hidden
+                if not arenaFrame.SAdUI_PortraitHooked then
+                    hooksecurefunc(arenaFrame, "Show", function(self)
+                        HidePortrait(self)
+                    end)
+                    arenaFrame.SAdUI_PortraitHooked = true
+                end
             end
         end
-        
-        -- Hook to hide portraits when frames are shown
-        hooksecurefunc("ArenaEnemyFrame_UpdatePlayer", function(frame)
-            HidePortrait(frame)
-        end)
     end
 end
 
@@ -1235,3 +1880,94 @@ end
 -- end
 -- -- end
 
+
+
+
+-- "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_EMOTE", "CHAT_MSG_TEXT_EMOTE",
+-- "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_BN_WHISPER", "CHAT_MSG_BN_WHISPER_INFORM",
+-- "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", 
+-- "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING",
+-- "CHAT_MSG_INSTANCE_CHAT", "CHAT_MSG_INSTANCE_CHAT_LEADER",
+-- "CHAT_MSG_GUILD", "CHAT_MSG_OFFICER",
+-- "CHAT_MSG_CHANNEL", "CHAT_MSG_CHANNEL_JOIN", "CHAT_MSG_CHANNEL_LEAVE",
+-- "CHAT_MSG_BN_CONVERSATION",
+-- "CHAT_MSG_COMMUNITIES_CHANNEL",
+-- "CHAT_MSG_AFK", "CHAT_MSG_DND",
+-- "CHAT_MSG_MONSTER_SAY", "CHAT_MSG_MONSTER_YELL", "CHAT_MSG_MONSTER_EMOTE", "CHAT_MSG_MONSTER_WHISPER"
+
+-- function addon:SetChatMessageFilter(chatEvent, allowChat)
+--     if not addon.activeChatFilters[chatEvent] then
+--         local filterFunc = self:CreateChatFilter(chatEvent)
+--         ChatFrame_AddMessageEventFilter(chatEvent, filterFunc)
+--         addon.activeChatFilters[chatEvent] = filterFunc
+--         addon:Debug(string.format("Added filter for %s", chatEvent))
+--     end
+-- end
+
+-- function addon:CreateChatFilter(chatEvent)
+--     return function(self, event, message, sender, ...)
+--         addon:Debug(string.format("Filtered %s from %s", chatEvent, sender))
+--         return true
+--     end
+-- end
+
+
+
+-- ===========================================================================
+-- SHARED FUNCTIONS
+-- ===========================================================================
+
+do -- Shared functions
+    function addon:addBorder(bar, borderWidth, borderColor)
+        if not bar then return end
+        
+        local size = borderWidth or self.vars.borderWidth
+        local colorHex = borderColor or self.vars.borderColor
+        local r, g, b, a = self:HexToRGB(colorHex)
+        
+        local borders = bar.SAdUnitFrames_Borders
+        
+        if borders then
+            borders.top:SetColorTexture(r, g, b, a)
+            borders.top:SetHeight(size)
+            borders.bottom:SetColorTexture(r, g, b, a)
+            borders.bottom:SetHeight(size)
+            borders.left:SetColorTexture(r, g, b, a)
+            borders.left:SetWidth(size)
+            borders.right:SetColorTexture(r, g, b, a)
+            borders.right:SetWidth(size)
+        else
+            borders = {}
+            
+            borders.top = bar:CreateTexture(nil, "OVERLAY")
+            borders.top:SetColorTexture(r, g, b, a)
+            borders.top:SetHeight(size)
+            borders.top:ClearAllPoints()
+            borders.top:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+            borders.top:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
+            
+            borders.bottom = bar:CreateTexture(nil, "OVERLAY")
+            borders.bottom:SetColorTexture(r, g, b, a)
+            borders.bottom:SetHeight(size)
+            borders.bottom:ClearAllPoints()
+            borders.bottom:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+            borders.bottom:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
+            
+            borders.left = bar:CreateTexture(nil, "OVERLAY")
+            borders.left:SetColorTexture(r, g, b, a)
+            borders.left:SetWidth(size)
+            borders.left:ClearAllPoints()
+            borders.left:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+            borders.left:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+            
+            borders.right = bar:CreateTexture(nil, "OVERLAY")
+            borders.right:SetColorTexture(r, g, b, a)
+            borders.right:SetWidth(size)
+            borders.right:ClearAllPoints()
+            borders.right:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
+            borders.right:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
+            
+            bar.SAdUnitFrames_Borders = borders
+        end
+    end
+end
